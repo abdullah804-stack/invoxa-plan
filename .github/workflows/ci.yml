@@ -51,12 +51,12 @@ jobs:
       # The official action needs a licence key on some accounts and gives no
       # usable log without admin rights, so gitleaks is installed and run
       # directly instead.
+      # Pinned version: the latest-release API is rate limited from shared
+      # runner IPs, which is what broke the first attempt at this job.
       - name: Install gitleaks
         run: |
           set -euo pipefail
-          VERSION="$(curl -sSfL https://api.github.com/repos/gitleaks/gitleaks/releases/latest \
-            | grep -m1 '"tag_name"' | cut -d'"' -f4 | sed 's/^v//')"
-          echo "gitleaks v${VERSION}"
+          VERSION=8.30.1
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" \
             | tar -xz -C /usr/local/bin gitleaks
           gitleaks version
