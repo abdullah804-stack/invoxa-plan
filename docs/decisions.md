@@ -73,6 +73,40 @@ pinned release (`8.30.1`) and runs `gitleaks git .` with the committed `.gitleak
 false positive came from the deterministic test signing key; the key is now assembled at
 runtime and the historical fixture is allowlisted by content, so the whole history scans clean.
 
+## 21 November 2026 — Week 3
+
+### One permission helper
+
+`scoped.ts` had `assertAction`, an exact copy of `requireAction` in `tenant.ts`. The copy was
+removed; `requireAction` is now the only role check a route can call after `resolveTenant`.
+
+### Numbering is a counter on the business
+
+The plan's rule is an atomic `findOneAndUpdate` with `$inc`. The counter lives on the business
+(`counters.invoice`, `counters.estimate`, `counters.credit_note`), so two parallel issues of
+different documents serialise on that one document and can never take the same number. The
+number is formatted from the business prefix and the returned counter. A failed save after the
+increment leaves a gap, which the plan allows; nothing ever reuses a number.
+
+### Mark paid records a settlement payment
+
+`paid` is set when the balance reaches zero, and `paid = sum of payments`. Mark paid therefore
+records a payment for the remaining balance (method `other`) flagged internally as a settlement;
+undo to sent removes exactly that payment and leaves real recorded payments alone. Without this,
+an invoice marked paid would report money as received that no payment record accounts for.
+
+### Delete a client: archive when history needs it
+
+An unused client is deleted. A client referenced by any non-draft document is archived instead,
+so an issued invoice keeps the client name it was sent with. Drafts that pointed at a deleted
+client keep their own client snapshot.
+
+### List paging uses keyset cursors
+
+Lists return `{ documents, nextCursor }`; the cursor carries the last row's sort value and id and
+the next query continues strictly after it. This avoids `skip` slowing down and avoids rows
+repeating while new documents arrive.
+
 ### Still open
 
 - Final name check against app stores, trademark databases and `.com`/`.app` domains.

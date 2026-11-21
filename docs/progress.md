@@ -57,3 +57,30 @@ without the secret — **verified**: 39 API tests pass, including A→B 404s on 
 logo upload, the forged-secret and expired-token cases, and the spawned-process boot refusal.
 The shared package's 55 tests still pass alongside them, and CI (build + secret scan) is green
 on `main`.
+
+## M3 — API domain (week 3) — done
+
+- [x] Clients CRUD with a normalised `nameKey`, search, and archive-instead-of-delete when an
+      issued document references the client
+- [x] Documents CRUD for invoices, estimates and credit notes in one collection; create is
+      idempotent on `clientUuid`
+- [x] Issue: atomic `findOneAndUpdate` with `$inc` on the business counter, separate INV, EST
+      and CN series, client and brand snapshots, default due date and issue date
+- [x] Lifecycle: payments, mark paid, undo to sent, void (owner only), duplicate, convert an
+      estimate to an invoice, apply a credit note (capped at the balance and the credit left)
+- [x] Issued documents reject item, price, client and currency edits and accept notes, terms
+      and due date
+- [x] List filters: `docType`, stored and derived `status`, `clientId`, `q`, date range, sort,
+      limit (max 100) and keyset cursor paging
+- [x] Saved line items; `GET /reports/summary` with totals per currency, counts, due-soon and
+      recent documents
+- [x] One role helper: the duplicate `assertAction` was removed, so `requireAction` in
+      `tenant.ts` is the only way a route checks permissions
+- [x] Suites: client book, document lifecycle and numbering, filters and paging, summary,
+      saved items, and ownership for every new resource
+
+**Done when:** all lifecycle and ownership tests pass — **verified**: 61 API tests pass, among
+them 20 parallel issues producing `INV-0001`…`INV-0020` with no duplicates, overpayment
+rejected, issued documents refusing item edits, credit notes capped at the balance, cursor
+paging returning each document once, and A→B 404s on documents, clients and saved items.
+The shared package's 55 tests still pass alongside them.

@@ -5,8 +5,6 @@ import {
   type Model,
   type UpdateQuery,
 } from 'mongoose';
-import { can, type Action } from '@invoxa/shared';
-import { errors } from './errors.js';
 import type { TenantContext } from './tenant.js';
 
 /**
@@ -21,10 +19,16 @@ import type { TenantContext } from './tenant.js';
  */
 export interface ScopedRepository<TDoc> {
   find(filter?: FilterQuery<TDoc>, limit?: number): Promise<HydratedDocument<TDoc>[]>;
+  /** Sorted and limited in the database, still with the tenant key injected. */
+  findSorted(
+    filter: FilterQuery<TDoc>,
+    sort: Record<string, 1 | -1>,
+    limit: number,
+  ): Promise<HydratedDocument<TDoc>[]>;
   findById(id: string): Promise<HydratedDocument<TDoc> | null>;
   findOne(filter: FilterQuery<TDoc>): Promise<HydratedDocument<TDoc> | null>;
   count(filter?: FilterQuery<TDoc>): Promise<number>;
-  create(data: Partial<TDoc>): Promise<HydratedDocument<TDoc>>;
+  create(data: Record<string, unknown>): Promise<HydratedDocument<TDoc>>;
   updateById(id: string, update: UpdateQuery<TDoc>): Promise<HydratedDocument<TDoc> | null>;
   deleteById(id: string): Promise<HydratedDocument<TDoc> | null>;
 }
@@ -47,6 +51,8 @@ export function scoped<TDoc>(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return limited.exec() as Promise<any>;
     },
+    findSorted: (filter, sort, limit) =>
+      model.find(withBusiness(filter)).sort(sort).limit(limit).exec() as Promise<never>,
     findById: (id) =>
       model.findOne(withBusiness({ _id: id } as FilterQuery<TDoc>)).exec() as Promise<never>,
     findOne: (filter) => model.findOne(withBusiness(filter)).exec() as Promise<never>,
@@ -63,11 +69,4 @@ export function scoped<TDoc>(
         .findOneAndDelete(withBusiness({ _id: id } as FilterQuery<TDoc>))
         .exec() as Promise<never>,
   };
-}
-
-/** Role check for a resource action, on top of the tenant check. */
-export function assertAction(context: TenantContext, action: Action): void {
-  if (!can(context.role, action)) {
-    throw errors.forbidden();
-  }
 }
