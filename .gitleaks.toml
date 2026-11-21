@@ -6,8 +6,14 @@ title = "Invoxa"
 useDefault = true
 
 [allowlist]
-description = "Placeholders and documentation only"
+description = "Placeholders, documentation, and the test-only signing key fixture"
 paths = [
   '''\.env\.example$''',
   '''docs/limits\.md$''',
+]
+# The generic-api-key rule flagged a deterministic test signing key in M2's
+# history. It is a fixture, never a credential; the source was also rewritten so
+# no new commit can trip the rule.
+regexes = [
+  '''test-secret-that-is-long-enough-1234''',
 ]

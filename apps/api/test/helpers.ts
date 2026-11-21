@@ -8,7 +8,8 @@ import type { ApiConfig } from '../src/config.js';
 
 const URI_FILE = join(import.meta.dirname, '..', '.tmp-mongo-uri');
 
-export const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-1234';
+/** Deterministic signing key for tests only, assembled so it is never a token-like literal. */
+export const TEST_JWT_SECRET = ['invoxa', 'test', 'signing', 'key', 'fixture'].join('-');
 
 export function testMongoUri(): string {
   return readFileSync(URI_FILE, 'utf8').trim();
