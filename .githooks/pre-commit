@@ -1,0 +1,18 @@
+#!/bin/sh
+# Invoxa pre-commit hook: block committed secrets and failing type checks.
+# Enable with: git config core.hooksPath .githooks
+set -e
+
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact --no-banner || {
+    echo ""
+    echo "gitleaks: staged secrets detected. Remove them before committing."
+    exit 1
+  }
+else
+  echo "gitleaks not installed - skipping secret scan (CI still runs it)."
+  echo "Install: https://github.com/gitleaks/gitleaks#installing"
+fi
+
+echo "typecheck..."
+npm run typecheck --silent

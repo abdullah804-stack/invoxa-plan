@@ -1,0 +1,13 @@
+# gitleaks configuration. Extends the default rules and only allows placeholder
+# files, never real values.
+title = "Invoxa"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholders and documentation only"
+paths = [
+  '''\.env\.example$''',
+  '''docs/limits\.md$''',
+]

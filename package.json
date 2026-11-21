@@ -1,0 +1,36 @@
+{
+  "name": "invoxa",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Invoxa - invoicing for small business owners. Say it. Send it. Get paid.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev:api": "npm run dev --workspace @invoxa/api",
+    "dev:mobile": "npm run start --workspace @invoxa/mobile",
+    "build:shared": "npm run build --workspace @invoxa/shared",
+    "typecheck": "npm run build:shared && npm run typecheck --workspace @invoxa/shared --workspace @invoxa/api --workspace @invoxa/mobile",
+    "test": "npm run build:shared && npm run test --workspace @invoxa/shared",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "audit": "npm audit --audit-level=high",
+    "hooks": "git config core.hooksPath .githooks"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/node": "^24.10.1",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.4",
+    "vitest": "^5.1.1"
+  }
+}

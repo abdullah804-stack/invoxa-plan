@@ -1,0 +1,41 @@
+# dependencies
+node_modules/
+.pnp/
+.pnp.*
+
+# build output
+dist/
+build/
+*.tsbuildinfo
+coverage/
+
+# expo
+.expo/
+.expo-shared/
+web-build/
+android/
+ios/
+
+# secrets - only .env.example is committed
+.env
+.env.*
+!.env.example
+
+# logs
+*.log
+npm-debug.log*
+
+# os / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# chat attachments
+.cloud-attachments/
+
+# local sqlite / temp
+*.sqlite
+*.sqlite-journal
+tmp/
