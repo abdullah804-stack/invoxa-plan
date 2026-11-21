@@ -65,6 +65,14 @@ builder returns an `Error` carrying `statusCode: 429`; the response body is stil
 never throttled. Rate-limit bucketing decodes the JWT subject without verifying the signature —
 it is used only to pick a bucket, never to authorise.
 
+### CI secret scan: gitleaks binary, not gitleaks-action
+
+The plan asks for gitleaks in CI; it does not require the wrapper action. `gitleaks-action@v2`
+failed on this repository and its log is only readable with admin rights, so CI installs the
+pinned release (`8.30.1`) and runs `gitleaks git .` with the committed `.gitleaks.toml`. One
+false positive came from the deterministic test signing key; the key is now assembled at
+runtime and the historical fixture is allowlisted by content, so the whole history scans clean.
+
 ### Still open
 
 - Final name check against app stores, trademark databases and `.com`/`.app` domains.

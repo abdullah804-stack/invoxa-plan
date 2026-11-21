@@ -55,4 +55,5 @@ on `main` for commit `c21a658`.
 **Done when:** user A cannot read or change user B's business, and the server refuses to boot
 without the secret — **verified**: 39 API tests pass, including A→B 404s on read, write and
 logo upload, the forged-secret and expired-token cases, and the spawned-process boot refusal.
-The shared package's 55 tests still pass alongside them.
+The shared package's 55 tests still pass alongside them, and CI (build + secret scan) is green
+on `main`.
