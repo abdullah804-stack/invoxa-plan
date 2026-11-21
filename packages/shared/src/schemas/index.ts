@@ -5,3 +5,4 @@ export * from './payment.js';
 export * from './client.js';
 export * from './business.js';
 export * from './document.js';
+export * from './auth.js';

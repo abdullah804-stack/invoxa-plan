@@ -43,6 +43,28 @@ The plan calls for a **private** repository. The connected repository
 either switch it to private in GitHub settings, or accept that the code is public. No secrets
 are ever committed either way, but a public repo exposes the product before release.
 
+## 21 November 2026 — Week 2
+
+### bcryptjs instead of native bcrypt
+
+The plan says "bcrypt cost 12". `bcryptjs` is used because it is the same bcrypt algorithm
+(cost 12, `$2b$` hashes are interchangeable) without a native build step, which fails often on
+Windows and needs a compiler on the deploy host. Hashes produced here verify with any bcrypt
+library, so this is a packaging choice, not a change of algorithm.
+
+### API framework: Fastify 5
+
+The plan allows Fastify or Express. Fastify gives schema-level body limits, a first-class
+error handler and `inject()` for tests without an open port.
+
+### Rate limiting details
+
+`@fastify/rate-limit` v10 throws the `errorResponseBuilder` result at the error handler, so the
+builder returns an `Error` carrying `statusCode: 429`; the response body is still the one
+`{ error: { code, message, details } }` shape. Health checks are exempt so a keep-warm ping is
+never throttled. Rate-limit bucketing decodes the JWT subject without verifying the signature —
+it is used only to pick a bucket, never to authorise.
+
 ### Still open
 
 - Final name check against app stores, trademark databases and `.com`/`.app` domains.

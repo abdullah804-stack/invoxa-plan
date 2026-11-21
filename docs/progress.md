@@ -32,11 +32,27 @@ on `main` for commit `c21a658`.
 **Done when:** all totals and status tests pass — **verified**: 55 tests in 4 files pass
 (`totals`, `status`, `numbering`, `schemas`), joined by `npm audit` at 0 vulnerabilities.
 
-## M2 — API foundation (week 2) — next
+## M2 — API foundation (week 2) — done
 
-Server skeleton, health route, central error shape, Helmet, CORS, body limits, rate limits,
-Mongoose models (users, memberships, businesses, brandAssets), JWT startup check, auth routes,
-scoped query helper, brand asset uploads, Supertest suites.
+- [x] Fastify 5 skeleton: health route (no auth, no database call), central error shape with the
+      plan's ten codes, Helmet, strict CORS from `CORS_ORIGINS`, 1 MB bodies, rate limits
+      (120/min per user, 10/min per IP on register and login)
+- [x] Startup guard: `JWT_SECRET` required and at least 32 characters, no fallback; the process
+      exits before Mongo is touched (proved by a test that spawns the real entry point)
+- [x] Mongoose models: users, memberships, businesses, brandAssets
+- [x] bcrypt cost 12, 7-day JWT, owner always taken from the token
+- [x] Register creates user + business + owner membership; login; `GET` and `DELETE /auth/me`
+      (password required; removes everything the account solely owned)
+- [x] Tenant resolution: `X-Business-Id` or the first business, membership check, 404 for
+      non-members, 403 from the shared role matrix
+- [x] The scoped query helper that injects the business ID into every query
+- [x] Operator injection stripped from bodies, queries and params (`$`, dotted, prototype keys)
+- [x] Business profile `GET`/`PUT`, logo and signature upload with PNG/JPEG magic-byte checks,
+      300 KB / 100 KB limits and single-copy storage by content hash
+- [x] Supertest suites: auth, config, health, validation and injection, ownership and roles,
+      brand assets
 
 **Done when:** user A cannot read or change user B's business, and the server refuses to boot
-without the secret.
+without the secret — **verified**: 39 API tests pass, including A→B 404s on read, write and
+logo upload, the forged-secret and expired-token cases, and the spawned-process boot refusal.
+The shared package's 55 tests still pass alongside them.

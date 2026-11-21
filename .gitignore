@@ -35,6 +35,9 @@ Thumbs.db
 # chat attachments
 .cloud-attachments/
 
+# test artifacts
+.tmp-mongo-uri
+
 # local sqlite / temp
 *.sqlite
 *.sqlite-journal

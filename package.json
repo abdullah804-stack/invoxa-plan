@@ -15,7 +15,7 @@
     "dev:mobile": "npm run start --workspace @invoxa/mobile",
     "build:shared": "npm run build --workspace @invoxa/shared",
     "typecheck": "npm run build:shared && npm run typecheck --workspace @invoxa/shared --workspace @invoxa/api --workspace @invoxa/mobile",
-    "test": "npm run build:shared && npm run test --workspace @invoxa/shared",
+    "test": "npm run build:shared && npm run test --workspace @invoxa/shared --workspace @invoxa/api",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
