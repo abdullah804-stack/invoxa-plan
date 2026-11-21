@@ -16,7 +16,8 @@ is actually true.
 - [x] `docs/limits.md` with sourced, current free-tier limits
 - [x] `docs/decisions.md` with the week-1 product decisions
 
-**Done when:** CI is green on an empty test — true once the first push runs.
+**Done when:** CI is green on an empty test — **verified**: workflow CI completed successfully
+on `main` for commit `c21a658`.
 
 ## M1 — Shared core (week 1) — done
 
@@ -28,7 +29,8 @@ is actually true.
 - [x] Money and date formatting, currency exponents, English label dictionary
 - [x] English labels, document titles and status labels
 
-**Done when:** all totals and status tests pass — see `npm test` output in the commit.
+**Done when:** all totals and status tests pass — **verified**: 55 tests in 4 files pass
+(`totals`, `status`, `numbering`, `schemas`), joined by `npm audit` at 0 vulnerabilities.
 
 ## M2 — API foundation (week 2) — next
 
