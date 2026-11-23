@@ -1,6 +1,7 @@
+import type { InvoiceTemplate } from '@invoxa/shared';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -15,11 +16,14 @@ import {
 import { BrandPreview } from '../src/components/BrandPreview';
 import { Button } from '../src/components/Button';
 import { Card } from '../src/components/Card';
+import { InvoiceHtmlView } from '../src/components/InvoiceHtmlView';
+import { Segmented } from '../src/components/Segmented';
 import { ErrorState } from '../src/components/States';
 import { Screen } from '../src/components/Screen';
 import { TextField } from '../src/components/TextField';
 import { useProfile, useRemoveLogo, useUpdateProfile, useUploadLogo } from '../src/api/hooks';
 import { errorMessage } from '../src/lib/errors';
+import { sampleInvoiceHtml } from '../src/lib/invoiceHtml';
 import { pickLogoDataUrl } from '../src/lib/logo';
 import {
   BRAND_SWATCHES,
@@ -32,6 +36,12 @@ import {
 import { useTheme } from '../src/theme/ThemeProvider';
 
 const STEP_TITLES = ['Your business', 'Your brand', 'Ready to send'] as const;
+
+const TEMPLATE_OPTIONS: { value: InvoiceTemplate; label: string }[] = [
+  { value: 'classic', label: 'Classic' },
+  { value: 'modern', label: 'Modern' },
+  { value: 'minimal', label: 'Minimal' },
+];
 
 export default function OnboardingScreen() {
   const { colors } = useTheme();
@@ -50,6 +60,7 @@ export default function OnboardingScreen() {
   const [address, setAddress] = useState('');
   const [color, setColor] = useState(DEFAULT_BRAND_COLOR);
   const [hexInput, setHexInput] = useState(DEFAULT_BRAND_COLOR);
+  const [template, setTemplate] = useState<InvoiceTemplate>('classic');
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -64,6 +75,7 @@ export default function OnboardingScreen() {
     setAddress(business.address ?? '');
     setColor(business.branding.color || DEFAULT_BRAND_COLOR);
     setHexInput(business.branding.color || DEFAULT_BRAND_COLOR);
+    setTemplate(business.branding.template);
     setLogoDataUrl(profile.data.logo?.dataUrl ?? null);
     setHydrated(true);
   }, [profile.data, hydrated]);
@@ -79,6 +91,25 @@ export default function OnboardingScreen() {
     setColor(value);
     setHexInput(value);
   };
+
+  const business = profile.data?.business;
+  const previewHtml = useMemo(
+    () =>
+      sampleInvoiceHtml({
+        businessName: name,
+        color,
+        template,
+        logoDataUrl,
+        email,
+        phone,
+        address,
+        currency: business?.currency ?? 'USD',
+        pageSize: business?.pageSize ?? 'A4',
+        language: business?.language ?? 'en',
+        fontPair: business?.branding.fontPair ?? 'manrope-inter',
+      }),
+    [name, color, template, logoDataUrl, email, phone, address, business],
+  );
 
   // The preview only ever shows a logo the server has accepted, so a failed
   // upload can never look saved. The previous logo stays until its replacement
@@ -128,7 +159,7 @@ export default function OnboardingScreen() {
         if (!saved) return;
       }
       if (step === 1) {
-        await updateProfile.mutateAsync({ branding: { color } });
+        await updateProfile.mutateAsync({ branding: { color, template } });
       }
       if (step === 2) {
         close();
@@ -306,6 +337,15 @@ export default function OnboardingScreen() {
                       : undefined
                   }
                 />
+                <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>
+                  Invoice template
+                </Text>
+                <Segmented
+                  options={TEMPLATE_OPTIONS}
+                  value={template}
+                  onChange={setTemplate}
+                  accessibilityLabel="Invoice template"
+                />
               </Card>
 
               <Card style={styles.brandCard}>
@@ -357,14 +397,20 @@ export default function OnboardingScreen() {
           {step > 0 ? (
             <View style={styles.previewBlock}>
               <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Live preview</Text>
-              <BrandPreview
-                businessName={name}
-                color={color}
-                logoDataUrl={logoDataUrl}
-                email={email}
-                phone={phone}
-                address={address}
-              />
+              {Platform.OS === 'web' ? (
+                <BrandPreview
+                  businessName={name}
+                  color={color}
+                  logoDataUrl={logoDataUrl}
+                  email={email}
+                  phone={phone}
+                  address={address}
+                />
+              ) : (
+                <View style={[styles.previewFrame, { borderColor: colors.border }]}>
+                  <InvoiceHtmlView html={previewHtml} style={styles.previewWebview} />
+                </View>
+              )}
             </View>
           ) : null}
 
@@ -492,6 +538,17 @@ const styles = StyleSheet.create({
   },
   previewBlock: {
     gap: spacing.sm,
+  },
+  previewFrame: {
+    height: 420,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+  },
+  previewWebview: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
   },
   formError: {
     ...typeScale.small,

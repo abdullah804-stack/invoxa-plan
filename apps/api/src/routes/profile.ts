@@ -12,6 +12,7 @@ import {
 } from '../brandAssets.js';
 import { BrandAsset } from '../models/brandAsset.js';
 import { Business } from '../models/business.js';
+import { scoped } from '../scoped.js';
 import { applyBusinessUpdate, serializeBusiness } from '../services/business.js';
 import { requireAction, resolveTenant } from '../tenant.js';
 import { parseOrThrow } from '../validation.js';
@@ -89,6 +90,34 @@ export const profileRoutes: FastifyPluginAsync<ProfileRouteOptions> = async (app
       business: serializeBusiness(business),
       logo: await assetFor(business, 'logo'),
       signature: await assetFor(business, 'signature'),
+    };
+  });
+
+  /**
+   * One stored brand asset by ID, so an issued document can render the logo it
+   * was issued with even after the business has changed it.
+   */
+  app.get('/brand-assets/:id', { preHandler: authenticateRequest }, async (request) => {
+    const context = await resolveTenant(request);
+    requireAction(context, 'documents:read');
+
+    const id = (request.params as { id?: string }).id ?? '';
+    if (!Types.ObjectId.isValid(id)) {
+      throw errors.notFound();
+    }
+
+    const asset = await scoped(BrandAsset, context).findById(id);
+    if (!asset) {
+      throw errors.notFound();
+    }
+
+    return {
+      asset: {
+        id: String(asset._id),
+        mime: asset.mime,
+        size: asset.size,
+        dataUrl: asset.dataUrl,
+      },
     };
   });
 

@@ -1,5 +1,6 @@
 import { apiRequest } from './client';
 import type {
+  BrandAsset,
   Business,
   BusinessRef,
   Client,
@@ -76,6 +77,10 @@ export function uploadLogo(dataUrl: string): Promise<{ logo: { id: string; dataU
 
 export function removeLogo(): Promise<{ logo: null }> {
   return apiRequest('/profile/logo', { method: 'DELETE' });
+}
+
+export function fetchBrandAsset(id: string): Promise<{ asset: BrandAsset }> {
+  return apiRequest<{ asset: BrandAsset }>(`/brand-assets/${id}`);
 }
 
 export function listDocuments(params: DocumentListParams): Promise<DocumentListResponse> {

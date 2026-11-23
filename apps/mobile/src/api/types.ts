@@ -86,6 +86,30 @@ export interface DocumentLineItem {
   unit?: string;
 }
 
+export interface DocumentBrandSnapshot {
+  businessName: string;
+  contactName: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  taxId: string | null;
+  website: string | null;
+  branding: Branding;
+  paymentInstructions: string | null;
+  paymentLink: string | null;
+  pageSize: 'A4' | 'LETTER';
+  language: string;
+}
+
+export interface DocumentAdjustment {
+  id: string;
+  type: 'late_fee';
+  amount: number;
+  basisPoints?: number;
+  appliedAt: string;
+  effectiveDate: string | null;
+}
+
 export interface DocumentPayment {
   id: string;
   amount: number;
@@ -124,6 +148,8 @@ export interface DocumentRecord {
     address: string | null;
     taxId: string | null;
   } | null;
+  brandSnapshot: DocumentBrandSnapshot | null;
+  adjustments: DocumentAdjustment[];
   items: DocumentLineItem[];
   currency: string;
   discount: { type: 'percent'; valueBp: number } | { type: 'fixed'; valueMinor: number } | null;

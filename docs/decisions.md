@@ -193,3 +193,50 @@ inserting a USD price into a EUR invoice would silently change the amount.
 Onboarding used to set the picked image as the current logo before the upload answered, so a
 failed upload looked saved and the preview and the next step disagreed. The preview now changes
 only from the upload response; a failure keeps the previous logo (or none) and shows the error.
+
+## 23 November 2026 — Week 6
+
+### The PDF is made on the phone, from shared HTML
+
+The renderer lives in `packages/shared` as a pure string function: it takes the document, the
+business and the client, and returns the HTML the browser prints. On the phone `expo-print`
+turns that same HTML into a PDF and `expo-sharing` opens the share sheet. There is no headless
+Chromium on the API: the free Render instance has 512 MB, Chromium is hundreds of megabytes and
+would turn a free host into a paid one, and rendering on the phone also works offline. The
+renderer computes totals with `computeTotals` instead of accepting them, so the PDF cannot
+disagree with the stored document.
+
+### One HTML, two audiences
+
+The in-app preview is that HTML in a `WebView`, with scripts disabled and a screen-only media
+query that fits the page to the phone. Print and PDF keep the physical page (`@page size: A4`
+or `letter`, 12–14 mm margins), so what the preview shows and what the client receives are the
+same markup. The web build has no web view, so it keeps the native `BrandPreview` in onboarding
+and says plainly that PDF export is a phone feature.
+
+### Fonts are system fonts
+
+The plan's font pairs are honoured as families, not embedded font files: a Lora pair uses the
+platform serif, the others the platform sans with Manrope-like metrics. Downloading Google Fonts
+at print time would make the PDF depend on the network and leak a request to a third party for
+every invoice, and embedding three weights of two families costs hundreds of kilobytes in every
+PDF. The brand colour, logo, template and layout carry the identity instead.
+
+### Issued documents keep the logo they were issued with
+
+The brand snapshot stores asset IDs, not image bytes, so a later logo change must not rewrite
+history. Week 6 adds `GET /brand-assets/:id`, which returns one stored asset scoped to the
+business; the preview fetches the snapshot's asset when it differs from the profile's current
+one. Viewers can read assets because they can read documents.
+
+### Templates are chosen in onboarding
+
+The renderer supports classic, modern and minimal, so the brand step now lets an owner pick one
+and saves it with the colour. Existing businesses keep classic. An issued document renders with
+the template frozen in its snapshot.
+
+### New mobile dependencies
+
+`expo-print`, `expo-sharing` and `react-native-webview`, all installed with `expo install` at the
+SDK 58 versions. They are official Expo modules and do not need a paid service. `npm audit` still
+reports only the three moderate Expo tooling advisories noted in week 4.

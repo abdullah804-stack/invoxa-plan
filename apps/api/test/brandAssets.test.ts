@@ -127,6 +127,32 @@ describe('brand assets', () => {
     expect(tooBig.status).toBe(413);
   });
 
+  it('returns a stored asset by id for issued documents, and only within the business', async () => {
+    const upload = await testApp
+      .request()
+      .put('/api/v1/profile/logo')
+      .set(headersFor(account))
+      .send({ dataUrl: PNG_DATA_URL });
+    const id = upload.body.logo.id as string;
+
+    const read = await testApp.request().get(`/api/v1/brand-assets/${id}`).set(headersFor(account));
+    expect(read.status).toBe(200);
+    expect(read.body.asset.dataUrl).toBe(PNG_DATA_URL);
+
+    const other = await registerAccount(testApp.request, { businessName: 'Other Studio' });
+    const foreign = await testApp
+      .request()
+      .get(`/api/v1/brand-assets/${id}`)
+      .set(headersFor(other));
+    expect(foreign.status).toBe(404);
+
+    const malformed = await testApp
+      .request()
+      .get('/api/v1/brand-assets/not-an-id')
+      .set(headersFor(account));
+    expect(malformed.status).toBe(404);
+  });
+
   it('clears a logo on delete', async () => {
     await testApp
       .request()

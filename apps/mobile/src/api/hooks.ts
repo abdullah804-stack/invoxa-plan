@@ -7,6 +7,7 @@ import {
   deleteClient,
   deleteDocument,
   duplicateDocument,
+  fetchBrandAsset,
   fetchClient,
   fetchDocument,
   fetchProfile,
@@ -48,6 +49,7 @@ export const queryKeys = {
     ['clients', businessId, params] as const,
   client: (businessId: string | null, id: string) => ['client', businessId, id] as const,
   savedItems: (businessId: string | null) => ['saved-items', businessId] as const,
+  brandAsset: (businessId: string | null, id: string) => ['brand-asset', businessId, id] as const,
 };
 
 export function useProfile() {
@@ -87,6 +89,17 @@ export function useDocument(id: string | undefined) {
     queryKey: queryKeys.document(activeBusinessId, id ?? ''),
     queryFn: () => fetchDocument(id as string),
     enabled: status === 'signedIn' && Boolean(activeBusinessId) && Boolean(id),
+  });
+}
+
+/** A stored logo or signature by ID, used to render issued documents as sent. */
+export function useBrandAsset(id: string | null | undefined) {
+  const { status, activeBusinessId } = useSession();
+  return useQuery({
+    queryKey: queryKeys.brandAsset(activeBusinessId, id ?? ''),
+    queryFn: () => fetchBrandAsset(id as string),
+    enabled: status === 'signedIn' && Boolean(activeBusinessId) && Boolean(id),
+    staleTime: 5 * 60_000,
   });
 }
 

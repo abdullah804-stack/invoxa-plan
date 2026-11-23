@@ -143,3 +143,30 @@ payment, and see the client's billed/paid/outstanding update — **not yet verif
 ESLint and Prettier, `npm test` at 62 API tests (including the new client-summary case) plus
 the shared suite, and an Android Metro bundle (`expo export --platform android`). No screen was
 clicked through on a device or emulator in this workspace.
+
+## M6 — Branded PDF (week 6) — built, device check pending
+
+- [x] `renderInvoiceHtml` in `packages/shared`: one pure HTML/CSS renderer, no DOM and no
+      network, computing its totals with the shared `computeTotals`
+- [x] Three templates (classic, modern, minimal), logo left/right/centred, the brand colour with
+      a readable on-brand text colour, A4 or Letter through `@page`, paid/overdue/void stamps
+- [x] Header with business contact and logo, bill-to block with dates and reference, line table
+      (discount column only when a line has one), totals, payments, notes, terms, payment
+      instructions and an https pay link, signature block and footer
+- [x] Every user value escaped, the colour validated, image sources limited to PNG/JPEG data
+      URLs and links to https, so document text can never inject markup into the PDF
+- [x] Document preview screen: the real HTML in a web view (`react-native-webview`, scripts off)
+      with Share PDF (`expo-print` then the share sheet via `expo-sharing`) and Print
+- [x] The preview action is on every document, draft, issued or void
+- [x] Onboarding Preview now shows the real renderer on the phone (the native preview stays as
+      the web fallback) and offers the three templates, saved to the business branding
+- [x] `GET /brand-assets/:id`, scoped by business, so an issued document is rendered with the
+      logo and signature frozen onto it even after the business changes them
+
+**Done when:** a real invoice opens as a PDF you would send a client, and the share sheet opens
+from the phone — **not yet verified on hardware**, because no phone is attached to this
+workspace. What is verified: 66 shared tests (11 new renderer tests covering totals, tax modes,
+page sizes, templates, escaping, unsafe images/links, stamps and the estimate layout), 63 API
+tests including the brand-asset read and its cross-business 404, strict TypeScript, ESLint,
+Prettier, and Android **and** web Metro bundles. The rendered page itself was not opened in a
+browser or a PDF viewer here.

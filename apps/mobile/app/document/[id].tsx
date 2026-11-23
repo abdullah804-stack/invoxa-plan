@@ -483,6 +483,12 @@ export default function DocumentDetailScreen() {
                 />
               ) : null}
 
+              <Button
+                title="Preview and share PDF"
+                variant="secondary"
+                onPress={() => router.push(`/document/preview?id=${document.id}`)}
+              />
+
               {canDuplicate ? (
                 <Button
                   title="Duplicate"

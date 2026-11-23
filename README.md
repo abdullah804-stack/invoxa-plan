@@ -28,7 +28,7 @@ npm run dev:api      # Fastify API on PORT (default 4000)
 npm run dev:mobile   # Expo app (Expo Go or a dev build)
 ```
 
-### API (M2–M5)
+### API (M2–M6)
 
 Base path `/api/v1`. All routes except `register`, `login` and `health` need
 `Authorization: Bearer <jwt>`; business routes read `X-Business-Id` (first business if absent)
@@ -38,7 +38,7 @@ and `X-Timezone`.
 | --------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | Health    | `GET /health` (no auth, no database call)                                                                                                    |
 | Auth      | `POST /auth/register`, `POST /auth/login`, `GET /auth/me`, `DELETE /auth/me`                                                                 |
-| Profile   | `GET /profile`, `PUT /profile`, `PUT`/`DELETE /profile/logo`, `PUT`/`DELETE /profile/signature`                                              |
+| Profile   | `GET /profile`, `PUT /profile`, `PUT`/`DELETE /profile/logo`, `PUT`/`DELETE /profile/signature`, `GET /brand-assets/:id`                     |
 | Clients   | `GET`/`POST /clients`, `GET`/`PUT`/`DELETE /clients/:id` (the detail read includes per-currency billed, paid and outstanding)                |
 | Documents | `GET`/`POST /invoices`, `GET`/`PUT`/`DELETE /invoices/:id`, plus `/issue`, `/payments`, `/status`, `/duplicate`, `/convert`, `/apply-credit` |
 | Reports   | `GET /reports/summary`                                                                                                                       |
@@ -48,7 +48,7 @@ Errors always use `{ "error": { "code", "message", "details": [] } }`. A record 
 business returns 404, never 403. Copy `apps/api/.env.example` to `apps/api/.env`; the server
 refuses to start without a `JWT_SECRET` of 32+ characters.
 
-### Mobile (M4–M5)
+### Mobile (M4–M6)
 
 Expo Router app with an auth gate, SecureStore session, light and dark theme tokens, a three-step
 brand setup, a document editor with live shared totals, document detail actions and the client
@@ -73,6 +73,8 @@ npm run dev:mobile                             # then scan the QR code or press 
   duplicates and deletes a draft. Issued documents never change items or prices.
 - The Clients tab lists the book with search and archived clients; one client shows billed, paid
   and outstanding per currency and the documents issued to them.
+- Every document has a preview built by the shared `renderInvoiceHtml`: the same HTML prints to a
+  PDF that opens in the phone's share sheet. Three templates are chosen during brand onboarding.
 - Settings switches light, dark or system, and reopens the brand setup. Owners see the edit
   button; staff and viewers do not. A logo only appears after the upload has succeeded.
 
