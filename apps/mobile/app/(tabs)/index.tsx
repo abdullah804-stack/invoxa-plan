@@ -156,7 +156,10 @@ export default function DashboardScreen() {
                         index > 0 ? [styles.separator, { borderTopColor: colors.border }] : null,
                       ]}
                     >
-                      <DocumentRow document={document} />
+                      <DocumentRow
+                        document={document}
+                        onPress={() => router.push(`/document/${document.id}`)}
+                      />
                     </View>
                   ))}
                 </Card>
@@ -183,7 +186,10 @@ export default function DashboardScreen() {
                         index > 0 ? [styles.separator, { borderTopColor: colors.border }] : null,
                       ]}
                     >
-                      <DocumentRow document={document} />
+                      <DocumentRow
+                        document={document}
+                        onPress={() => router.push(`/document/${document.id}`)}
+                      />
                     </View>
                   ))}
                 </Card>

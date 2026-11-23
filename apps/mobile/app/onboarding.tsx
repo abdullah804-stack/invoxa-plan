@@ -80,12 +80,14 @@ export default function OnboardingScreen() {
     setHexInput(value);
   };
 
+  // The preview only ever shows a logo the server has accepted, so a failed
+  // upload can never look saved. The previous logo stays until its replacement
+  // has actually been stored.
   const chooseLogo = async () => {
     setLogoError(null);
     try {
       const dataUrl = await pickLogoDataUrl();
       if (!dataUrl) return;
-      setLogoDataUrl(dataUrl);
       const result = await uploadLogo.mutateAsync(dataUrl);
       setLogoDataUrl(result.logo.dataUrl);
     } catch (error) {

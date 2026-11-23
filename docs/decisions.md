@@ -163,3 +163,33 @@ Expo SDK 58 with React 19.3 and React Native 0.88, Expo Router 58, React Query 5
 Inter through `@expo-google-fonts`. `npm audit` reports three moderate advisories from Expo's
 `@expo/fingerprint` → `minimatch` chain with no high or critical findings; CI gates on high and
 above. They are build-time tooling, not shipped code, and Expo owns the fix.
+
+## 23 November 2026 — Week 5
+
+### Client totals come from one server read
+
+The client screen needs billed, paid and outstanding per currency. Folding the client's document
+list on the phone would be wrong past one page and would duplicate cancellation rules. M5 adds
+`GET /clients/:id`, which reads that client's documents and reuses `computeOutstanding` exactly
+as the dashboard summary does, so both screens can never disagree. The response carries the
+client, one row per currency and the 20 most recently touched documents.
+
+### The editor previews with the shared totals function, the server stores its own
+
+The editor calls `computeTotals` on every keystroke for the live total and the per-line nets.
+The API ignores those numbers: it recomputes and stores `totals` on save, so a preview bug can
+never change what is owed. Prices are parsed from text into minor units with `majorToMinor`, and
+lines the parser cannot read are left out of the preview rather than treated as zero.
+
+### Drafts only, currency from the profile
+
+The editor only writes drafts; issuing is a separate action on the detail screen, so an accidental
+tap cannot spend a number. New documents take the business currency and tax defaults from the
+profile. Saved line items are offered only when their currency matches the document, because
+inserting a USD price into a EUR invoice would silently change the amount.
+
+### A logo is shown only after the server has it
+
+Onboarding used to set the picked image as the current logo before the upload answered, so a
+failed upload looked saved and the preview and the next step disagreed. The preview now changes
+only from the upload response; a failure keeps the previous logo (or none) and shows the error.

@@ -28,26 +28,31 @@ npm run dev:api      # Fastify API on PORT (default 4000)
 npm run dev:mobile   # Expo app (Expo Go or a dev build)
 ```
 
-### API (M2)
+### API (M2–M5)
 
 Base path `/api/v1`. All routes except `register`, `login` and `health` need
 `Authorization: Bearer <jwt>`; business routes read `X-Business-Id` (first business if absent)
 and `X-Timezone`.
 
-| Area    | Endpoints                                                                                       |
-| ------- | ----------------------------------------------------------------------------------------------- |
-| Health  | `GET /health` (no auth, no database call)                                                       |
-| Auth    | `POST /auth/register`, `POST /auth/login`, `GET /auth/me`, `DELETE /auth/me`                    |
-| Profile | `GET /profile`, `PUT /profile`, `PUT`/`DELETE /profile/logo`, `PUT`/`DELETE /profile/signature` |
+| Area      | Endpoints                                                                                                                                    |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Health    | `GET /health` (no auth, no database call)                                                                                                    |
+| Auth      | `POST /auth/register`, `POST /auth/login`, `GET /auth/me`, `DELETE /auth/me`                                                                 |
+| Profile   | `GET /profile`, `PUT /profile`, `PUT`/`DELETE /profile/logo`, `PUT`/`DELETE /profile/signature`                                              |
+| Clients   | `GET`/`POST /clients`, `GET`/`PUT`/`DELETE /clients/:id` (the detail read includes per-currency billed, paid and outstanding)                |
+| Documents | `GET`/`POST /invoices`, `GET`/`PUT`/`DELETE /invoices/:id`, plus `/issue`, `/payments`, `/status`, `/duplicate`, `/convert`, `/apply-credit` |
+| Reports   | `GET /reports/summary`                                                                                                                       |
+| Extras    | `GET`/`POST /saved-items`, `DELETE /saved-items/:id`                                                                                         |
 
 Errors always use `{ "error": { "code", "message", "details": [] } }`. A record in another
 business returns 404, never 403. Copy `apps/api/.env.example` to `apps/api/.env`; the server
 refuses to start without a `JWT_SECRET` of 32+ characters.
 
-### Mobile (M4)
+### Mobile (M4–M5)
 
 Expo Router app with an auth gate, SecureStore session, light and dark theme tokens, a three-step
-brand setup and the dashboard and invoice list reading the M3 API.
+brand setup, a document editor with live shared totals, document detail actions and the client
+book.
 
 ```bash
 cp apps/mobile/.env.example apps/mobile/.env   # EXPO_PUBLIC_API_URL
@@ -61,8 +66,15 @@ npm run dev:mobile                             # then scan the QR code or press 
   on the phone to 600 px and under 300 KB), then a live preview.
 - The token and a session snapshot live in SecureStore: a restart is instant and stays signed
   in, and any 401 signs out in one place.
+- The editor creates invoices, estimates and credit notes as drafts: pick a client, add lines
+  (with a per-line discount or one from your saved items), set a discount and the tax mode, and
+  the totals preview uses the same shared function the server stores.
+- A document's screen issues drafts, records a payment, marks paid, undoes that, voids (owners),
+  duplicates and deletes a draft. Issued documents never change items or prices.
+- The Clients tab lists the book with search and archived clients; one client shows billed, paid
+  and outstanding per currency and the documents issued to them.
 - Settings switches light, dark or system, and reopens the brand setup. Owners see the edit
-  button; staff and viewers do not.
+  button; staff and viewers do not. A logo only appears after the upload has succeeded.
 
 ## Rules this codebase follows
 

@@ -73,6 +73,10 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
         }}
       >
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="document/new" />
+        <Stack.Screen name="document/[id]" />
+        <Stack.Screen name="client/[id]" />
+        <Stack.Screen name="client/new" options={{ presentation: 'modal' }} />
         <Stack.Screen name="onboarding" options={{ presentation: 'modal' }} />
       </Stack>
     </>

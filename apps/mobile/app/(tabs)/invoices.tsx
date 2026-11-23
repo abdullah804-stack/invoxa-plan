@@ -1,5 +1,6 @@
 import { can } from '@invoxa/shared';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -57,6 +58,7 @@ const SORT_ORDER: SortKey[] = ['newest', 'oldest', 'dueDate', 'amount'];
 
 export default function InvoicesScreen() {
   const { colors } = useTheme();
+  const router = useRouter();
   const { activeRole } = useSession();
   const duplicate = useDuplicateDocument();
 
@@ -98,6 +100,7 @@ export default function InvoicesScreen() {
   );
 
   const canDuplicate = activeRole ? can(activeRole, 'documents:duplicate') : false;
+  const canCreate = activeRole ? can(activeRole, 'drafts:create') : false;
 
   const showNotice = (message: string) => {
     setNotice(message);
@@ -129,15 +132,29 @@ export default function InvoicesScreen() {
       <View style={styles.header}>
         <View style={styles.titleRow}>
           <Text style={[styles.title, { color: colors.text }]}>Invoices</Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Sort by ${SORT_LABELS[sort]}, tap to change`}
-            onPress={cycleSort}
-            style={[styles.sortButton, { borderColor: colors.border }]}
-          >
-            <Ionicons name="swap-vertical" size={15} color={colors.textMuted} />
-            <Text style={[styles.sortLabel, { color: colors.textMuted }]}>{SORT_LABELS[sort]}</Text>
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Sort by ${SORT_LABELS[sort]}, tap to change`}
+              onPress={cycleSort}
+              style={[styles.sortButton, { borderColor: colors.border }]}
+            >
+              <Ionicons name="swap-vertical" size={15} color={colors.textMuted} />
+              <Text style={[styles.sortLabel, { color: colors.textMuted }]}>
+                {SORT_LABELS[sort]}
+              </Text>
+            </Pressable>
+            {canCreate ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="New document"
+                onPress={() => router.push('/document/new')}
+                style={[styles.newButton, { backgroundColor: colors.accent }]}
+              >
+                <Ionicons name="add" size={18} color={colors.onAccent} />
+              </Pressable>
+            ) : null}
+          </View>
         </View>
 
         <TextField
@@ -241,7 +258,7 @@ export default function InvoicesScreen() {
               onAction={() => onDuplicate(item.id)}
               disabled={!canDuplicate}
             >
-              <DocumentRow document={item} />
+              <DocumentRow document={item} onPress={() => router.push(`/document/${item.id}`)} />
             </SwipeRow>
           )}
         />
@@ -264,6 +281,18 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typeScale.display,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  newButton: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sortButton: {
     flexDirection: 'row',

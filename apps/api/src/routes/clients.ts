@@ -4,6 +4,7 @@ import {
   clientInputSchema,
   clientListQuerySchema,
   clientUpdateSchema,
+  computeOutstanding,
   normalizeNameKey,
 } from '@invoxa/shared';
 import type { ApiConfig } from '../config.js';
@@ -13,7 +14,13 @@ import { Client, type ClientRecord } from '../models/client.js';
 import { Document } from '../models/document.js';
 import { escapeRegex } from '../pagination.js';
 import { scoped } from '../scoped.js';
-import { serializeClient } from '../services/documents.js';
+import {
+  requestToday,
+  serializeClient,
+  serializeDocument,
+  shownStatusFor,
+  totalsFor,
+} from '../services/documents.js';
 import { requireAction, resolveTenant } from '../tenant.js';
 import { parseOrThrow } from '../validation.js';
 
@@ -44,6 +51,63 @@ export const clientRoutes: FastifyPluginAsync<ClientRouteOptions> = async (app, 
     );
 
     return { clients: clients.map(serializeClient) };
+  });
+
+  /**
+   * One client with the money owed on their issued documents, per currency,
+   * plus their recent documents. Drafts and void documents never count.
+   */
+  app.get('/clients/:id', { preHandler: authenticateRequest }, async (request) => {
+    const context = await resolveTenant(request);
+    requireAction(context, 'clients:read');
+
+    const id = (request.params as { id?: string }).id ?? '';
+    if (!Types.ObjectId.isValid(id)) {
+      throw errors.notFound();
+    }
+
+    const client = await scoped(Client, context).findById(id);
+    if (!client) {
+      throw errors.notFound();
+    }
+
+    const today = requestToday(request);
+    const documents = await scoped(Document, context).find({ clientId: client._id });
+    const byCurrency = new Map<
+      string,
+      { currency: string; billed: number; paid: number; outstanding: number; overdue: number }
+    >();
+
+    for (const doc of documents) {
+      if (doc.status === 'void' || doc.status === 'draft') continue;
+      const totals = doc.totals ?? totalsFor(doc);
+      const live = computeOutstanding([
+        { total: totals.total, paid: totals.paid, status: doc.status },
+      ]);
+      const row = byCurrency.get(doc.currency) ?? {
+        currency: doc.currency,
+        billed: 0,
+        paid: 0,
+        outstanding: 0,
+        overdue: 0,
+      };
+      row.billed += live.billed;
+      row.paid += live.paid;
+      row.outstanding += live.outstanding;
+      if (shownStatusFor(doc, today) === 'overdue' && doc.docType === 'invoice') {
+        row.overdue += totals.balance;
+      }
+      byCurrency.set(doc.currency, row);
+    }
+
+    return {
+      client: serializeClient(client),
+      currencies: [...byCurrency.values()].sort((a, b) => a.currency.localeCompare(b.currency)),
+      documents: [...documents]
+        .sort((a, b) => (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0))
+        .slice(0, 20)
+        .map((doc) => serializeDocument(doc, today)),
+    };
   });
 
   app.post('/clients', { preHandler: authenticateRequest }, async (request, reply) => {

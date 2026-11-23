@@ -1,11 +1,17 @@
 import { formatDate, formatMoney } from '@invoxa/shared';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { DocumentRecord } from '../api/types';
 import { spacing, typeScale } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { StatusPill } from './StatusPill';
 
-export function DocumentRow({ document }: { document: DocumentRecord }) {
+export function DocumentRow({
+  document,
+  onPress,
+}: {
+  document: DocumentRecord;
+  onPress?: () => void;
+}) {
   const { colors } = useTheme();
   const subtitle =
     document.docType === 'estimate' && document.validUntil
@@ -16,7 +22,7 @@ export function DocumentRow({ document }: { document: DocumentRecord }) {
           ? formatDate(document.issueDate)
           : 'No date yet';
 
-  return (
+  const row = (
     <View style={styles.row}>
       <View style={styles.left}>
         <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
@@ -38,6 +44,19 @@ export function DocumentRow({ document }: { document: DocumentRecord }) {
         <StatusPill status={document.shownStatus} />
       </View>
     </View>
+  );
+
+  if (!onPress) return row;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${document.number ?? 'Draft'} for ${document.clientName ?? 'no client'}`}
+      onPress={onPress}
+      style={({ pressed }) => (pressed ? styles.pressed : null)}
+    >
+      {row}
+    </Pressable>
   );
 }
 
@@ -71,5 +90,8 @@ const styles = StyleSheet.create({
   },
   amount: {
     ...typeScale.bodyStrong,
+  },
+  pressed: {
+    opacity: 0.7,
   },
 });

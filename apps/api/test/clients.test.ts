@@ -133,6 +133,63 @@ describe('clients', () => {
     expect(await Client.findById(unused.id)).toBeNull();
   });
 
+  it('shows the money owed by one client, per currency', async () => {
+    const client = await createClient({ name: 'Summary Client' });
+
+    const draft = await request()
+      .post('/api/v1/invoices')
+      .set(headersFor(owner))
+      .send({
+        clientUuid: `uuid-${randomSuffix()}`,
+        docType: 'invoice',
+        clientId: client.id,
+        items: [{ description: 'Retainer', quantity: 1, unitPrice: 500000 }],
+        currency: 'USD',
+      });
+    expect(draft.status).toBe(201);
+    const issued = await request()
+      .post(`/api/v1/invoices/${String(draft.body.document.id)}/issue`)
+      .set(headersFor(owner))
+      .send({});
+    expect(issued.status).toBe(200);
+
+    const payment = await request()
+      .post(`/api/v1/invoices/${String(draft.body.document.id)}/payments`)
+      .set(headersFor(owner))
+      .send({ amount: 200000, method: 'bank_transfer' });
+    expect(payment.status).toBe(201);
+
+    // A draft for the same client must not count as billed.
+    await request()
+      .post('/api/v1/invoices')
+      .set(headersFor(owner))
+      .send({
+        clientUuid: `uuid-${randomSuffix()}`,
+        docType: 'invoice',
+        clientId: client.id,
+        items: [{ description: 'Unsent', quantity: 1, unitPrice: 99900 }],
+        currency: 'USD',
+      });
+
+    const detail = await request().get(`/api/v1/clients/${client.id}`).set(headersFor(owner));
+    expect(detail.status).toBe(200);
+    expect(detail.body.client.name).toBe('Summary Client');
+    expect(detail.body.currencies).toHaveLength(1);
+    expect(detail.body.currencies[0]).toMatchObject({
+      currency: 'USD',
+      billed: 500000,
+      paid: 200000,
+      outstanding: 300000,
+    });
+    expect(detail.body.documents).toHaveLength(2);
+
+    const mallory = await registerAccount(request, { businessName: 'Other Ltd' });
+    const foreign = await request()
+      .get(`/api/v1/clients/${client.id}`)
+      .set(headersFor(mallory, owner.businessId));
+    expect(foreign.status).toBe(404);
+  });
+
   it('keeps clients inside their business', async () => {
     const mallory = await registerAccount(request, { businessName: 'Mallory Ltd' });
     const client = await createClient({ name: 'Private Client' });

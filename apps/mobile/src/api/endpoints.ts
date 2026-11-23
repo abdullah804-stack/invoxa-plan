@@ -2,10 +2,17 @@ import { apiRequest } from './client';
 import type {
   Business,
   BusinessRef,
+  Client,
+  ClientDetailResponse,
+  ClientListParams,
+  ClientListResponse,
+  DocumentDraftBody,
   DocumentListParams,
   DocumentListResponse,
   DocumentRecord,
+  PaymentInput,
   Profile,
+  SavedItem,
   Summary,
   User,
 } from './types';
@@ -76,12 +83,114 @@ export function listDocuments(params: DocumentListParams): Promise<DocumentListR
     query: {
       docType: params.docType,
       status: params.status,
+      clientId: params.clientId,
       q: params.q,
       sort: params.sort,
       limit: params.limit,
       cursor: params.cursor,
     },
   });
+}
+
+export function fetchDocument(id: string): Promise<{ document: DocumentRecord }> {
+  return apiRequest<{ document: DocumentRecord }>(`/invoices/${id}`);
+}
+
+export function createDocument(
+  input: DocumentDraftBody & {
+    clientUuid: string;
+    docType: 'invoice' | 'estimate' | 'credit_note';
+  },
+): Promise<{ document: DocumentRecord }> {
+  return apiRequest<{ document: DocumentRecord }>('/invoices', { method: 'POST', body: input });
+}
+
+export function updateDocument(
+  id: string,
+  input: Partial<DocumentDraftBody>,
+): Promise<{ document: DocumentRecord }> {
+  return apiRequest<{ document: DocumentRecord }>(`/invoices/${id}`, {
+    method: 'PUT',
+    body: input,
+  });
+}
+
+export function issueDocument(
+  id: string,
+  input: { issueDate?: string; dueDate?: string },
+): Promise<{ document: DocumentRecord }> {
+  return apiRequest<{ document: DocumentRecord }>(`/invoices/${id}/issue`, {
+    method: 'POST',
+    body: input,
+  });
+}
+
+export function deleteDocument(id: string): Promise<null> {
+  return apiRequest<null>(`/invoices/${id}`, { method: 'DELETE' });
+}
+
+export function recordPayment(
+  id: string,
+  input: PaymentInput,
+): Promise<{ document: DocumentRecord }> {
+  return apiRequest<{ document: DocumentRecord }>(`/invoices/${id}/payments`, {
+    method: 'POST',
+    body: input,
+  });
+}
+
+export function setDocumentStatus(
+  id: string,
+  status: 'sent' | 'paid' | 'void',
+): Promise<{ document: DocumentRecord }> {
+  return apiRequest<{ document: DocumentRecord }>(`/invoices/${id}/status`, {
+    method: 'POST',
+    body: { status },
+  });
+}
+
+export function listClients(params: ClientListParams): Promise<ClientListResponse> {
+  return apiRequest<ClientListResponse>('/clients', {
+    query: { q: params.q, archived: params.archived, limit: params.limit },
+  });
+}
+
+export function fetchClient(id: string): Promise<ClientDetailResponse> {
+  return apiRequest<ClientDetailResponse>(`/clients/${id}`);
+}
+
+export interface ClientInput {
+  name?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  taxId?: string;
+  notes?: string;
+  archived?: boolean;
+}
+
+export function createClient(input: ClientInput): Promise<{ client: Client }> {
+  return apiRequest<{ client: Client }>('/clients', { method: 'POST', body: input });
+}
+
+export function updateClient(id: string, input: ClientInput): Promise<{ client: Client }> {
+  return apiRequest<{ client: Client }>(`/clients/${id}`, { method: 'PUT', body: input });
+}
+
+export function deleteClient(id: string): Promise<{ archived?: boolean } | null> {
+  return apiRequest<{ archived?: boolean } | null>(`/clients/${id}`, { method: 'DELETE' });
+}
+
+export function listSavedItems(): Promise<{ savedItems: SavedItem[] }> {
+  return apiRequest<{ savedItems: SavedItem[] }>('/saved-items');
+}
+
+export function createSavedItem(input: {
+  description: string;
+  unitPrice: number;
+  currency: string;
+}): Promise<{ savedItem: SavedItem }> {
+  return apiRequest<{ savedItem: SavedItem }>('/saved-items', { method: 'POST', body: input });
 }
 
 export function duplicateDocument(id: string): Promise<{ document: DocumentRecord }> {

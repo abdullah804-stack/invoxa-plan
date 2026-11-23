@@ -114,3 +114,32 @@ strict TypeScript check passes for the app, ESLint and Prettier pass, and Metro 
 Android bundle (`expo export --platform android`) with the workspace shared package resolved.
 No phone is attached to this workspace, so signing up, picking a logo and restarting on a real
 device is still to be done before this milestone is ticked.
+
+## M5 — Mobile core (week 5) — built, device check pending
+
+- [x] Invoice editor for invoices, estimates and credit notes: client picker backed by the client
+      book, line items with quantity, price and per-line discount, add/remove lines
+- [x] Invoice-level discount (percent or fixed) and tax mode (added or included) with the rate
+      from the business profile, all previewed live by the shared `computeTotals` function
+- [x] Saved line items: insert a saved line in one tap, and save a line from the editor
+- [x] Drafts save through `POST`/`PUT /invoices`; dates, reference, notes and terms; the number
+      is still only assigned on issue
+- [x] Document detail: issue a draft, record a payment (amount, method, reference, note), mark
+      paid, undo mark paid, void (owners), duplicate, and delete a draft
+- [x] Issued documents show their frozen client copy, lines, totals, payments and notes; editing
+      is only offered on drafts
+- [x] Client book tab: search, archived filter, loading, empty and error states, create and edit
+      a client with the shared Zod schema inline errors
+- [x] Client detail with billed, paid, outstanding and overdue per currency and the documents
+      issued to that client; archive instead of delete when history needs it
+- [x] New `GET /clients/:id` read so those totals are computed once on the server from the same
+      shared function, not folded on the phone
+- [x] Brand onboarding no longer shows a logo preview before the upload succeeded: a failed
+      upload leaves the previously saved logo (or none) and shows the error
+
+**Done when:** on a phone you write an invoice with a discount and tax, issue it, record a part
+payment, and see the client's billed/paid/outstanding update — **not yet verified on hardware**
+(same missing device as M4). What is verified: strict TypeScript for all three workspaces,
+ESLint and Prettier, `npm test` at 62 API tests (including the new client-summary case) plus
+the shared suite, and an Android Metro bundle (`expo export --platform android`). No screen was
+clicked through on a device or emulator in this workspace.

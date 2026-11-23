@@ -149,6 +149,7 @@ export interface DocumentListResponse {
 
 export interface DocumentListParams {
   docType?: 'invoice' | 'estimate' | 'credit_note';
+  clientId?: string;
   status?: 'draft' | 'sent' | 'paid' | 'void' | 'partial' | 'overdue' | 'expired';
   q?: string;
   sort?: 'newest' | 'oldest' | 'dueDate' | 'amount';
@@ -162,6 +163,72 @@ export interface CurrencySummary {
   paid: number;
   outstanding: number;
   overdue: number;
+}
+
+export interface SavedItem {
+  id: string;
+  description: string;
+  unitPrice: number;
+  currency: string;
+}
+
+export interface ClientCurrencySummary {
+  currency: string;
+  billed: number;
+  paid: number;
+  outstanding: number;
+  overdue: number;
+}
+
+export interface ClientDetailResponse {
+  client: Client;
+  currencies: ClientCurrencySummary[];
+  documents: DocumentRecord[];
+}
+
+export interface ClientListParams {
+  q?: string;
+  archived?: 'true' | 'false' | 'all';
+  limit?: number;
+}
+
+export interface ClientListResponse {
+  clients: Client[];
+}
+
+export type PaymentMethod = 'cash' | 'bank_transfer' | 'card' | 'mobile_money' | 'cheque' | 'other';
+
+export interface DocumentDraftItemInput {
+  id?: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  discountBp?: number;
+  unit?: string;
+}
+
+/** Body for creating or updating a draft; totals are always computed by the server. */
+export interface DocumentDraftBody {
+  clientId?: string;
+  items: DocumentDraftItemInput[];
+  currency: string;
+  discount?: { type: 'percent'; valueBp: number } | { type: 'fixed'; valueMinor: number } | null;
+  taxRateBp?: number;
+  taxMode?: 'added' | 'included';
+  issueDate?: string;
+  dueDate?: string;
+  validUntil?: string;
+  reference?: string;
+  notes?: string;
+  terms?: string;
+}
+
+export interface PaymentInput {
+  amount: number;
+  method: PaymentMethod;
+  paidAt?: string;
+  reference?: string;
+  note?: string;
 }
 
 export interface Summary {
