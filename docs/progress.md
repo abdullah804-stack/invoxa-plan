@@ -84,3 +84,33 @@ them 20 parallel issues producing `INV-0001`…`INV-0020` with no duplicates, ov
 rejected, issued documents refusing item edits, credit notes capped at the balance, cursor
 paging returning each document once, and A→B 404s on documents, clients and saved items.
 The shared package's 55 tests still pass alongside them.
+
+## M4 — Mobile foundation (week 4) — built, device check pending
+
+- [x] Expo SDK 58 app with Expo Router, `expo-router/entry`, and a Metro config that watches
+      the npm workspace root
+- [x] One auth gate in the root layout: signed-out users only see welcome, login and register;
+      signed-in users are never left on an auth screen
+- [x] SecureStore token and session snapshot, so a restart is instant and stays signed in;
+      a 401 from any request signs out in one place
+- [x] API client: JWT, `X-Business-Id`, `X-Timezone`, typed errors, field errors, a friendly
+      waking-server message and one query client with per-business cache keys
+- [x] Theme tokens for light and dark (Paper and Sage), Manrope and Inter, persisted
+      light/dark/system switch
+- [x] Base components: button, card, input, status pill, segmented control, filter chip,
+      skeleton, empty and error states, document row and a swipe-to-duplicate row
+- [x] Welcome, register and login with inline field errors from the shared Zod schemas
+- [x] Three-step brand onboarding (details, colour and logo, preview) saving to `PUT /profile`
+      and `PUT /profile/logo`; logo resized to 600 px and compressed under 300 KB, PNG/JPEG only
+- [x] Live brand preview using the business name, colour and logo as the invoice header
+- [x] Dashboard: outstanding, billed, paid and overdue per currency, due-soon and recent lists,
+      skeleton loading, empty and error states, pull to refresh
+- [x] Invoice list: search, status chips, type toggle, sort, cursor paging and swipe to duplicate
+- [x] Settings shell with business summary, theme switch, brand edit (owner only) and log out
+
+**Done when:** on a real phone you sign up, set a logo and colour, restart the app, and are
+still signed in with the brand saved — **not yet verified on hardware**. What is verified: the
+strict TypeScript check passes for the app, ESLint and Prettier pass, and Metro produces an
+Android bundle (`expo export --platform android`) with the workspace shared package resolved.
+No phone is attached to this workspace, so signing up, picking a logo and restarting on a real
+device is still to be done before this milestone is ticked.

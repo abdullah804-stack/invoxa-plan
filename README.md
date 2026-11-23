@@ -25,7 +25,7 @@ npm run lint         # ESLint
 npm run format       # Prettier
 npm run hooks        # enable the gitleaks + typecheck pre-commit hook
 npm run dev:api      # Fastify API on PORT (default 4000)
-npm run dev:mobile   # Expo app (arrives in M4)
+npm run dev:mobile   # Expo app (Expo Go or a dev build)
 ```
 
 ### API (M2)
@@ -43,6 +43,26 @@ and `X-Timezone`.
 Errors always use `{ "error": { "code", "message", "details": [] } }`. A record in another
 business returns 404, never 403. Copy `apps/api/.env.example` to `apps/api/.env`; the server
 refuses to start without a `JWT_SECRET` of 32+ characters.
+
+### Mobile (M4)
+
+Expo Router app with an auth gate, SecureStore session, light and dark theme tokens, a three-step
+brand setup and the dashboard and invoice list reading the M3 API.
+
+```bash
+cp apps/mobile/.env.example apps/mobile/.env   # EXPO_PUBLIC_API_URL
+npm run dev:mobile                             # then scan the QR code or press a / i / w
+```
+
+- `EXPO_PUBLIC_API_URL` defaults to `http://localhost:4000/api/v1`. On an Android emulator the
+  laptop server is `http://10.0.2.2:4000/api/v1`; on a phone on the same Wi-Fi use the laptop's
+  LAN address and add it to `CORS_ORIGINS` on the API.
+- Signing up opens the three-step brand setup: business details, then colour and logo (resized
+  on the phone to 600 px and under 300 KB), then a live preview.
+- The token and a session snapshot live in SecureStore: a restart is instant and stays signed
+  in, and any 401 signs out in one place.
+- Settings switches light, dark or system, and reopens the brand setup. Owners see the edit
+  button; staff and viewers do not.
 
 ## Rules this codebase follows
 

@@ -112,3 +112,54 @@ repeating while new documents arrive.
 - Final name check against app stores, trademark databases and `.com`/`.app` domains.
 - A real Android phone for dev-build testing (voice and notifications).
 - Accounts: MongoDB Atlas, Google AI Studio, Expo, Render, Netlify.
+
+## 23 November 2026 — Week 4
+
+### Expo Router with one gate in the root layout
+
+The route tree is `welcome`, `login`, `register`, `(tabs)/index`, `(tabs)/invoices`,
+`(tabs)/settings` and `onboarding` as a modal. One effect in `app/_layout.tsx` owns the gate, so
+adding a screen cannot accidentally leave a signed-out user inside the app or a signed-in user
+on an auth screen. There are no per-group guard layouts to keep in sync.
+
+### Session snapshot in SecureStore, not a network call at boot
+
+Starting the app restores the token, user and business list from SecureStore and then refreshes
+`GET /auth/me` in the background. The alternative (a required network round trip at boot) made
+"restart and still be signed in" depend on Render's free host being awake. A 401 still clears
+SecureStore; a network failure keeps the snapshot.
+
+### No gesture library for one row action
+
+`react-native-gesture-handler` 3.3 (the version Expo SDK 58 installs) no longer ships the legacy
+`Swipeable`, and its replacement needs Reanimated and a Babel plugin. Swipe-to-duplicate is one
+interaction, so `SwipeRow` is a small `PanResponder` + `Animated` component instead. It works on
+iOS, Android and web without another native dependency; the dependency was removed again.
+
+### Native brand preview until the real renderer arrives
+
+The plan suggests a simple HTML preview in week 4. Rendering HTML needs `react-native-webview`,
+another native dependency that the real renderer replaces in M6 anyway. `BrandPreview` draws the
+same header, bill-to, one line and total natively from the chosen colour and logo, so the
+onboarding preview is live and M6 swaps the component for `renderInvoiceHtml` without touching
+the flow.
+
+### Theme preference and tokens
+
+`src/theme/tokens.ts` holds one light and one dark palette, spacing, radii, the type scale and
+the contrast helper. The preference (light, dark or system) is stored in SecureStore rather than
+adding AsyncStorage for one string. On the web build SecureStore is unavailable, so a small
+storage wrapper falls back to `localStorage` and then to memory.
+
+### React Query for the API cache
+
+The app uses one query client. Query keys include the active business ID, so a future business
+switch cannot show another business's cached figures. Lists use cursor paging through
+`useInfiniteQuery`, matching the M3 API; nothing is fetched with `skip`.
+
+### Versions installed for M4
+
+Expo SDK 58 with React 19.3 and React Native 0.88, Expo Router 58, React Query 5, Manrope and
+Inter through `@expo-google-fonts`. `npm audit` reports three moderate advisories from Expo's
+`@expo/fingerprint` → `minimatch` chain with no high or critical findings; CI gates on high and
+above. They are build-time tooling, not shipped code, and Expo owns the fix.
