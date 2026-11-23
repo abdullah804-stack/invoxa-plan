@@ -237,7 +237,15 @@ export function renderInvoiceHtml(input: RenderInvoiceInput): string {
         <td class="col-description">${escapeHtml(item.description)}</td>
         <td class="num">${escapeHtml(quantity)}</td>
         <td class="num">${money(item.unitPrice)}</td>
-        ${hasLineDiscount ? `<td class="num">${((item.discountBp ?? 0) / 100).toFixed(2).replace(/\.?0+$/, '')}%</td>` : ''}
+        ${
+          hasLineDiscount
+            ? `<td class="num">${
+                (item.discountBp ?? 0) > 0
+                  ? `${((item.discountBp ?? 0) / 100).toFixed(2).replace(/\.?0+$/, '')}%`
+                  : '—'
+              }</td>`
+            : ''
+        }
         <td class="num strong">${money(line?.net ?? 0)}</td>
       </tr>`;
     })
@@ -280,7 +288,7 @@ export function renderInvoiceHtml(input: RenderInvoiceInput): string {
   const paymentsHtml =
     document.payments && document.payments.length > 0
       ? `<div class="payments">
-          <div class="section-title">${LABELS.amountPaid}</div>
+          <div class="section-title">${LABELS.payments}</div>
           ${document.payments
             .map(
               (payment) => `<div class="payment">
@@ -453,7 +461,7 @@ export function renderInvoiceHtml(input: RenderInvoiceInput): string {
   .summary { display: flex; justify-content: space-between; gap: 10mm; page-break-inside: avoid; }
   .summary-notes { flex: 1; display: flex; flex-direction: column; gap: 4mm; min-width: 0; }
   .note p { color: #3E4B44; font-size: 9.5pt; white-space: pre-wrap; overflow-wrap: anywhere; }
-  .pay-link { color: var(--brand); font-weight: 600; text-decoration: none; }
+  .pay-link { color: var(--brand); font-weight: 600; text-decoration: underline; }
   .payments { display: flex; flex-direction: column; gap: 1mm; }
   .payment { display: flex; justify-content: space-between; gap: 4mm; font-size: 9pt; color: #3E4B44; }
   .totals { width: 68mm; align-self: flex-start; }
@@ -498,17 +506,21 @@ export function renderInvoiceHtml(input: RenderInvoiceInput): string {
     justify-content: space-between;
     gap: 6mm;
   }
+  .template-classic .head { border-top: 2mm solid var(--brand); padding-top: 5mm; }
   .template-modern .head {
     background: var(--brand);
     color: var(--on-brand);
     padding: 8mm;
     border-radius: 2mm;
   }
+  .template-modern img.logo { background: rgba(255, 255, 255, 0.94); padding: 1.5mm; }
   .template-modern .brand-contact,
   .template-modern .doc-type { color: var(--on-brand); opacity: 0.9; }
   .template-modern .stamp { color: var(--on-brand); }
   .template-modern .logo-initial { background: rgba(255, 255, 255, 0.18); }
   .template-minimal .head { border-bottom: 0.4mm solid #E3DFD2; padding-bottom: 4mm; }
+  .template-minimal .parties { border-top: 0; padding-top: 0; }
+  .template-minimal .logo { width: 16mm; height: 16mm; background: transparent; border-radius: 0; }
   .template-minimal .doc-type { color: #5C6B63; }
   .template-minimal .brand-name { font-size: 14pt; letter-spacing: 0.06em; text-transform: uppercase; }
   .layout-logo-right .head { flex-direction: row-reverse; }
@@ -517,7 +529,13 @@ export function renderInvoiceHtml(input: RenderInvoiceInput): string {
   .layout-centered .brand { flex-direction: column; text-align: center; }
   .layout-centered .doc { text-align: center; }
   .layout-centered .parties { flex-direction: column; }
-  .layout-centered .meta { min-width: 0; width: 100%; }
+  .layout-centered .meta {
+    min-width: 0;
+    width: 100%;
+    max-width: 150mm;
+    margin: 0 auto;
+  }
+  .layout-centered .meta-row { justify-content: center; gap: 3mm; }
   /* The in-app preview fits the screen; print and PDF keep the physical page. */
   @media screen {
     .page { width: 100%; min-height: 0; padding: 4mm; }

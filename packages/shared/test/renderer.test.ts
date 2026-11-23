@@ -188,12 +188,18 @@ describe('renderInvoiceHtml', () => {
       input({
         document: {
           ...input().document,
-          items: [{ description: 'Design', quantity: 1, unitPrice: 10000, discountBp: 1500 }],
+          items: [
+            { description: 'Design', quantity: 1, unitPrice: 10000, discountBp: 1500 },
+            { description: 'Hosting', quantity: 1, unitPrice: 2000 },
+          ],
         },
       }),
     );
     expect(withLineDiscount).toContain('<th class="num">Discount</th>');
     expect(withLineDiscount).toContain('15%');
+    // A line without a discount shows a dash, not a misleading 0%.
+    expect(withLineDiscount).toContain('—');
+    expect(withLineDiscount).not.toContain('>0%<');
   });
 
   it('uses the estimate labels and validity date for an estimate', () => {

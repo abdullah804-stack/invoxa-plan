@@ -38,6 +38,7 @@ export const LABELS = {
   taxIncluded: 'Tax (included)',
   total: 'Total',
   amountPaid: 'Amount paid',
+  payments: 'Payments',
   balanceDue: 'Balance due',
   lateFee: 'Late fee',
   creditApplied: 'Credit applied',
