@@ -170,3 +170,30 @@ page sizes, templates, escaping, unsafe images/links, stamps and the estimate la
 tests including the brand-asset read and its cross-business 404, strict TypeScript, ESLint,
 Prettier, and Android **and** web Metro bundles. The rendered page itself was not opened in a
 browser or a PDF viewer here.
+
+## M7 — AI drafting (week 7) — built
+
+- [x] `POST /ai/draft`: a sentence in, a validated suggestion out — lines, quantities, prices in
+      minor units and an optional percent discount and tax rate
+- [x] The assistant never writes, numbers or sends a document; the app turns the suggestion into
+      an ordinary draft and opens the normal editor, so totals and dates stay in Invoxa
+- [x] Gemini over REST with `x-goog-api-key`, a JSON response schema and a 20-second timeout, so
+      no SDK dependency is added
+- [x] Own caps below the free tier: `AI_DAILY_LIMIT` (default 30) a day per user and 5 requests a
+      minute; a failed call refunds the day's count
+- [x] `ai:use` permission (owners and staff) and the usual business scoping; a viewer gets 403
+- [x] Prompts carry no business, client or invoice data, and email addresses or links typed by the
+      user are replaced before sending
+- [x] One-time Gemini notice in the app before the first prompt, kept on the device
+- [x] Mobile "Describe it": example prompts, invoice/estimate/credit type, then a real draft with
+      an existing client matched by name, or the typed name kept as the client snapshot
+- [x] AI entry point on the Invoices list only for roles with `ai:use`; a missing server key and a
+      used-up daily quota are shown as plain messages
+- [x] Bad model output is rejected (unreadable reply or no usable lines) instead of guessing
+
+**Done when:** on a phone you say what to invoice and get an editable draft — the API side is
+verified with a stubbed Gemini client; a real key and a device are still missing here. What is
+verified: 72 shared tests (6 new for prompt redaction and the AI schemas), 69 API tests (6 new
+for units, redaction in the outgoing prompt, permissions, quota, refunds and validation), strict
+TypeScript, ESLint, Prettier, and Android and web Metro bundles. No prompt was sent to Google
+from this workspace, because `GEMINI_API_KEY` is not set.

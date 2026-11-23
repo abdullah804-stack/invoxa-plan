@@ -236,6 +236,14 @@ export interface DocumentDraftItemInput {
 /** Body for creating or updating a draft; totals are always computed by the server. */
 export interface DocumentDraftBody {
   clientId?: string;
+  clientSnapshot?: {
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    taxId?: string | null;
+  };
+  source?: 'manual' | 'prompt' | 'voice' | 'recurring' | 'duplicate' | 'estimate';
   items: DocumentDraftItemInput[];
   currency: string;
   discount?: { type: 'percent'; valueBp: number } | { type: 'fixed'; valueMinor: number } | null;
@@ -247,6 +255,28 @@ export interface DocumentDraftBody {
   reference?: string;
   notes?: string;
   terms?: string;
+}
+
+export interface AiDraftItem {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  unit?: string;
+}
+
+export interface AiDraftSuggestion {
+  clientName?: string;
+  currency: string;
+  items: AiDraftItem[];
+  discount?: { type: 'percent'; valueBp: number } | { type: 'fixed'; valueMinor: number } | null;
+  taxRateBp?: number;
+  taxMode?: 'added' | 'included';
+  notes?: string;
+}
+
+export interface AiDraftResponse {
+  draft: AiDraftSuggestion;
+  remaining: number;
 }
 
 export interface PaymentInput {

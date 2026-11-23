@@ -28,7 +28,7 @@ npm run dev:api      # Fastify API on PORT (default 4000)
 npm run dev:mobile   # Expo app (Expo Go or a dev build)
 ```
 
-### API (M2–M6)
+### API (M2–M7)
 
 Base path `/api/v1`. All routes except `register`, `login` and `health` need
 `Authorization: Bearer <jwt>`; business routes read `X-Business-Id` (first business if absent)
@@ -42,13 +42,14 @@ and `X-Timezone`.
 | Clients   | `GET`/`POST /clients`, `GET`/`PUT`/`DELETE /clients/:id` (the detail read includes per-currency billed, paid and outstanding)                |
 | Documents | `GET`/`POST /invoices`, `GET`/`PUT`/`DELETE /invoices/:id`, plus `/issue`, `/payments`, `/status`, `/duplicate`, `/convert`, `/apply-credit` |
 | Reports   | `GET /reports/summary`                                                                                                                       |
+| AI        | `POST /ai/draft` (a sentence in, a validated draft suggestion out; no document is written)                                                   |
 | Extras    | `GET`/`POST /saved-items`, `DELETE /saved-items/:id`                                                                                         |
 
 Errors always use `{ "error": { "code", "message", "details": [] } }`. A record in another
 business returns 404, never 403. Copy `apps/api/.env.example` to `apps/api/.env`; the server
 refuses to start without a `JWT_SECRET` of 32+ characters.
 
-### Mobile (M4–M6)
+### Mobile (M4–M7)
 
 Expo Router app with an auth gate, SecureStore session, light and dark theme tokens, a three-step
 brand setup, a document editor with live shared totals, document detail actions and the client
@@ -77,6 +78,9 @@ npm run dev:mobile                             # then scan the QR code or press 
   PDF that opens in the phone's share sheet. Three templates are chosen during brand onboarding.
 - Settings switches light, dark or system, and reopens the brand setup. Owners see the edit
   button; staff and viewers do not. A logo only appears after the upload has succeeded.
+- "Describe it" turns one sentence into an editable draft: after the one-time Gemini notice it
+  creates an ordinary draft (reusing a client with the same name) and opens the editor. AI
+  drafting needs `GEMINI_API_KEY` on the API; without it the screen says so plainly.
 
 ## Rules this codebase follows
 

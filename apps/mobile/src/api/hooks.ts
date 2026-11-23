@@ -6,6 +6,7 @@ import {
   createSavedItem,
   deleteClient,
   deleteDocument,
+  draftWithAi,
   duplicateDocument,
   fetchBrandAsset,
   fetchClient,
@@ -148,6 +149,13 @@ function useDocumentCacheUpdates() {
     void queryClient.invalidateQueries({ queryKey: ['clients', activeBusinessId] });
     void queryClient.invalidateQueries({ queryKey: ['client', activeBusinessId] });
   };
+}
+
+export function useAiDraft() {
+  return useMutation({
+    mutationFn: (input: { prompt: string; docType: 'invoice' | 'estimate' | 'credit_note' }) =>
+      draftWithAi(input),
+  });
 }
 
 export function useCreateDocument() {

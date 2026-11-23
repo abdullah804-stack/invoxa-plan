@@ -67,4 +67,6 @@ export const StorageKeys = {
   businesses: 'invoxa.businesses',
   businessId: 'invoxa.businessId',
   theme: 'invoxa.theme',
+  /** One-time Gemini notice: prompts go to Google and may train its models. */
+  aiConsent: 'invoxa.aiConsent',
 } as const;

@@ -1,5 +1,6 @@
 import { apiRequest } from './client';
 import type {
+  AiDraftResponse,
   BrandAsset,
   Business,
   BusinessRef,
@@ -77,6 +78,17 @@ export function uploadLogo(dataUrl: string): Promise<{ logo: { id: string; dataU
 
 export function removeLogo(): Promise<{ logo: null }> {
   return apiRequest('/profile/logo', { method: 'DELETE' });
+}
+
+export function draftWithAi(input: {
+  prompt: string;
+  docType: 'invoice' | 'estimate' | 'credit_note';
+}): Promise<AiDraftResponse> {
+  return apiRequest<AiDraftResponse>('/ai/draft', {
+    method: 'POST',
+    body: input,
+    timeoutMs: 35_000,
+  });
 }
 
 export function fetchBrandAsset(id: string): Promise<{ asset: BrandAsset }> {

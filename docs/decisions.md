@@ -240,3 +240,48 @@ the template frozen in its snapshot.
 `expo-print`, `expo-sharing` and `react-native-webview`, all installed with `expo install` at the
 SDK 58 versions. They are official Expo modules and do not need a paid service. `npm audit` still
 reports only the three moderate Expo tooling advisories noted in week 4.
+
+## 23 November 2026 — Week 7
+
+### The assistant suggests, Invoxa decides
+
+`POST /ai/draft` returns a suggestion and writes nothing: no document, no number, no email. The
+app creates a normal draft from it with the same endpoint a manual draft uses, then opens the
+editor, so every rule (currency from the profile, totals computed on the server, numbers only on
+issue) still holds. A model reply that cannot be parsed becomes `AI_FAILED` rather than a
+half-filled invoice.
+
+### Decimal prices from the model, integer money in the app
+
+The model is asked for decimal amounts in the business currency; the server converts them with
+`majorToMinor` and validates the result against the shared `aiDraftSuggestionSchema`. Prices are
+clamped, empty descriptions dropped, at most 20 lines kept, and the currency is forced to the
+business currency instead of trusting the model's guess. Tax mode comes from the business, and a
+rate is only applied when the user stated one.
+
+### Prompts carry nothing from the database
+
+No business details, client records, invoices or saved items are attached to a prompt. Email
+addresses and links typed by the user are replaced with `[email removed]` and `[link removed]`
+before sending, because the free Gemini tier may use prompts to improve Google's products. The
+app shows that notice once and refuses to send until it is accepted.
+
+### Caps are ours, not Google's
+
+Rate limits on the free tier vary per project and change without notice, so Invoxa keeps its own:
+5 requests a minute on the route and `AI_DAILY_LIMIT` (30) a day per user, stored in `aiUsage`
+keyed by business, user and the user's own date. A call that failed did not use the assistant, so
+its count is refunded; an attempt that already exceeded the cap is decremented back too.
+
+### Plain `fetch`, no Gemini SDK
+
+The REST call is one `fetch` with an `x-goog-api-key` header (never a query string, so keys stay
+out of URL logs), a response schema and a 20-second abort. That avoids a dependency whose version
+would age against the model name, which already lives in `GEMINI_MODEL`.
+
+### Voice input is not in this week
+
+On-device speech recognition needs a development build and cannot run in Expo Go, and no phone is
+attached to this workspace. Shipping a screen that cannot be tested would be worse than leaving
+it out, so week 7 ships typing, with the notice and quota machinery voice will reuse. Voice stays
+on the list for the first milestone with a device.

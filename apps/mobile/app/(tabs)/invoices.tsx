@@ -101,6 +101,7 @@ export default function InvoicesScreen() {
 
   const canDuplicate = activeRole ? can(activeRole, 'documents:duplicate') : false;
   const canCreate = activeRole ? can(activeRole, 'drafts:create') : false;
+  const canUseAi = activeRole ? can(activeRole, 'ai:use') : false;
 
   const showNotice = (message: string) => {
     setNotice(message);
@@ -144,6 +145,16 @@ export default function InvoicesScreen() {
                 {SORT_LABELS[sort]}
               </Text>
             </Pressable>
+            {canUseAi ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Draft with AI"
+                onPress={() => router.push('/document/ai')}
+                style={[styles.aiButton, { borderColor: colors.accent }]}
+              >
+                <Ionicons name="sparkles-outline" size={17} color={colors.accent} />
+              </Pressable>
+            ) : null}
             {canCreate ? (
               <Pressable
                 accessibilityRole="button"
@@ -286,6 +297,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+  },
+  aiButton: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   newButton: {
     width: 34,
