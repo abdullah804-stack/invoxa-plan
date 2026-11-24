@@ -1,0 +1,57 @@
+name: Daily recurring drafts
+
+# Recurring invoices are due on their own date, even if nobody opens the app.
+# GitHub's cron is UTC and can run late or be dropped at peak load, which is why
+# the endpoint is idempotent and the app also calls it on open: a missed run is
+# caught up by the next one, and a double run creates nothing extra.
+on:
+  schedule:
+    - cron: '23 6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: daily-recurring
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Create due recurring drafts
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          JOB_SECRET: ${{ secrets.JOB_SECRET }}
+        run: |
+          set -euo pipefail
+
+          # Nothing is deployed yet in this workspace, so an unconfigured repo
+          # must not fail every morning. It says so in the run summary instead.
+          if [ -z "${API_URL:-}" ] || [ -z "${JOB_SECRET:-}" ]; then
+            echo "::warning::API_URL or JOB_SECRET is not set; skipping the daily recurring run."
+            exit 0
+          fi
+
+          base="${API_URL%/}"
+          case "$base" in
+            */api/v1) endpoint="$base/recurring/run" ;;
+            *) endpoint="$base/api/v1/recurring/run" ;;
+          esac
+
+          # A free Render instance sleeps after 15 minutes, so allow for the
+          # cold start and retry once the service is awake. --fail-with-body
+          # still prints the counts on success.
+          curl --silent --show-error --fail-with-body \
+            --max-time 120 \
+            --retry 3 --retry-delay 15 --retry-all-errors \
+            -X POST "$endpoint" \
+            -H "x-job-secret: $JOB_SECRET" \
+            -H 'content-type: application/json' \
+            -d '{}'
+
+          echo
+          echo "Daily recurring run finished."

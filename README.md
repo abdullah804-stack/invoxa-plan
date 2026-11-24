@@ -53,6 +53,20 @@ refuses to start without a `JWT_SECRET` of 32+ characters. `POST /recurring/run`
 `x-job-secret` header when called by a scheduler (set `JOB_SECRET`), and otherwise runs only the
 caller's business with a normal token.
 
+### Daily job
+
+`.github/workflows/daily-recurring.yml` runs at 06:23 UTC (and on demand from the Actions tab)
+and calls `POST /recurring/run` with the job secret, so recurring drafts appear even when nobody
+opens the app. Add two repository secrets under Settings → Secrets and variables → Actions:
+
+- `API_URL` — the deployed API base, e.g. `https://invoxa-api.onrender.com` (with or without
+  `/api/v1`).
+- `JOB_SECRET` — the same value as the API's `JOB_SECRET`.
+
+Until both exist the run skips with a warning instead of failing. GitHub can delay or drop a
+scheduled run, so the endpoint stays idempotent and the app calls it on open as well; a workflow is
+also disabled after 60 days without repository activity.
+
 ### Mobile (M4–M8)
 
 Expo Router app with an auth gate, SecureStore session, light and dark theme tokens, a three-step

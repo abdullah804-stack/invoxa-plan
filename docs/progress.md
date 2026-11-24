@@ -221,6 +221,9 @@ from this workspace, because `GEMINI_API_KEY` is not set.
       yearly ones keep 29 February, both covered by shared tests
 - [x] `POST /recurring/run` accepts the `x-job-secret` for the daily job (all businesses) or a
       normal token (the caller's business), and the app calls it on open
+- [x] A daily GitHub Actions workflow (06:23 UTC, plus manual dispatch) calls the run endpoint
+      with `JOB_SECRET`, so drafts appear without anyone opening the app; it skips with a warning
+      until the `API_URL` and `JOB_SECRET` repository secrets exist
 - [x] Pausing stops new drafts; resuming does not backfill missed months. Stopping keeps the
       drafts already made
 - [x] "Repeat this invoice" on an invoice, and a Recurring list with pause, resume, open the

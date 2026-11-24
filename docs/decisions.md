@@ -329,3 +329,13 @@ The job secret is the only unauthenticated path, and it only runs schedules; it 
 `expo-notifications` at the SDK 58 version, installed with `expo install`. It is an official Expo
 module, needs no paid service and is used for local notifications only. `npm audit` still reports
 only the three moderate Expo tooling advisories noted in week 4.
+
+### The daily run is a scheduled workflow, not a timer in the API
+
+The free Render instance sleeps after 15 minutes without traffic, so an in-process timer would
+rarely fire and would be lost on every spin-down. A GitHub Actions schedule calls the idempotent
+run endpoint instead: 06:23 UTC daily plus manual dispatch, authenticated with the `JOB_SECRET`
+header from repository secrets (never a file in the repo). GitHub can delay or drop cron runs, which
+is why the app still calls the same endpoint on open and why a repeated run cannot duplicate a
+draft. With no deployment yet, a missing `API_URL` or `JOB_SECRET` skips the run with a warning
+rather than failing every morning.
