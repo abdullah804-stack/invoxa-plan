@@ -35,8 +35,9 @@ Thumbs.db
 # chat attachments
 .cloud-attachments/
 
-# test artifacts
+# test artifacts, kept on the project drive rather than the system temp
 .tmp-mongo-uri
+.tmp-test/
 
 # local sqlite / temp
 *.sqlite

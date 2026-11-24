@@ -24,6 +24,7 @@ npm test             # shared totals, status, numbering and schema tests
 npm run lint         # ESLint
 npm run format       # Prettier
 npm run hooks        # enable the gitleaks + typecheck pre-commit hook
+npm test             # shared + API suites (in-memory MongoDB, data under .tmp-test/)
 npm run dev:api      # Fastify API on PORT (default 4000)
 npm run dev:mobile   # Expo app (Expo Go or a dev build)
 ```
