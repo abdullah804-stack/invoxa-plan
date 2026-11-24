@@ -259,3 +259,31 @@ invoice. What is verified: 81 shared tests (4 new for expense validation), 83 AP
 create/filter/totals, update/delete, permissions, tenant isolation and validation), strict
 TypeScript, ESLint, Prettier, and Android and web Metro bundles. No screen was clicked here, because
 no phone is attached to this workspace.
+
+## M10 — Projects and tracked time (week 10) — built
+
+- [x] Project model and `GET`/`POST /projects`, `GET`/`PUT`/`DELETE /projects/:id`: name, optional
+      client, status (active, completed, archived), currency, hourly rate, budget, start and due
+      dates, notes
+- [x] Writes need `clients:write` (owner or staff); every role reads with `projects:read`. Another
+      business's project is 404, and a project with time or invoices is archived instead of deleted
+      (409)
+- [x] Time entries keep their own rate and currency snapshot, so changing a project rate never
+      rewrites what was already worked or billed; entries are 1–1440 whole minutes, dated, with a
+      description and a billable flag
+- [x] `GET /time-entries` filters by project, date range and unbilled, and returns totals (logged,
+      billable, unbilled minutes plus their value) computed on the server; `time:write` gates writes
+- [x] `POST /projects/:id/bill` groups unbilled billable time by description and rate into one
+      **draft** invoice on the project, with the time as fractional-hour lines; the entries are
+      marked with the draft they went on and cannot be edited or deleted while billed
+- [x] Deleting that draft releases its time back to unbilled, so a mistake never strands hours
+- [x] Project detail returns the project, its time totals, its newest entries and its invoices;
+      the mobile list, form, detail (with budget progress) and add-time screens sit under Settings
+      → Projects, and the empty, loading and error states are all there
+
+**Done when:** you can put a client's work on a project, log hours against it and turn the unbilled
+hours into a draft invoice without retyping anything. What is verified: 86 shared tests (5 new for
+project, time and billing validation), 89 API tests (6 new for totals, billing and release,
+immutability of billed time, permissions, tenant isolation and deletion rules), strict TypeScript,
+ESLint, Prettier, and Android and web Metro bundles. No screen was clicked here, because no phone is
+attached to this workspace — the visual and device checks for M4–M10 are still unverified.

@@ -18,6 +18,13 @@ import type {
   ExpenseListResponse,
   PaymentInput,
   Profile,
+  Project,
+  ProjectDetailResponse,
+  ProjectInput,
+  ProjectStatus,
+  TimeEntry,
+  TimeEntryInput,
+  TimeEntryListResponse,
   RecurringSchedule,
   ReminderList,
   SavedItem,
@@ -315,4 +322,73 @@ export function updateExpense(
 
 export function deleteExpense(id: string): Promise<void> {
   return apiRequest<void>(`/expenses/${id}`, { method: 'DELETE' });
+}
+
+export function listProjects(
+  params: {
+    status?: ProjectStatus;
+    clientId?: string;
+    limit?: number;
+  } = {},
+): Promise<{ projects: Project[] }> {
+  return apiRequest<{ projects: Project[] }>('/projects', {
+    query: { status: params.status, clientId: params.clientId, limit: params.limit },
+  });
+}
+
+export function fetchProject(id: string): Promise<ProjectDetailResponse> {
+  return apiRequest<ProjectDetailResponse>(`/projects/${id}`);
+}
+
+export function createProject(input: ProjectInput): Promise<{ project: Project }> {
+  return apiRequest<{ project: Project }>('/projects', { method: 'POST', body: input });
+}
+
+export function updateProject(
+  id: string,
+  input: Partial<ProjectInput>,
+): Promise<{ project: Project }> {
+  return apiRequest<{ project: Project }>(`/projects/${id}`, { method: 'PUT', body: input });
+}
+
+export function deleteProject(id: string): Promise<void> {
+  return apiRequest<void>(`/projects/${id}`, { method: 'DELETE' });
+}
+
+export function listTimeEntries(
+  params: {
+    projectId?: string;
+    from?: string;
+    to?: string;
+    unbilled?: 'true' | 'false';
+    limit?: number;
+  } = {},
+): Promise<TimeEntryListResponse> {
+  return apiRequest<TimeEntryListResponse>('/time-entries', {
+    query: {
+      projectId: params.projectId,
+      from: params.from,
+      to: params.to,
+      unbilled: params.unbilled,
+      limit: params.limit,
+    },
+  });
+}
+
+export function createTimeEntry(input: TimeEntryInput): Promise<{ entry: TimeEntry }> {
+  return apiRequest<{ entry: TimeEntry }>('/time-entries', { method: 'POST', body: input });
+}
+
+export function deleteTimeEntry(id: string): Promise<void> {
+  return apiRequest<void>(`/time-entries/${id}`, { method: 'DELETE' });
+}
+
+export function billProjectTime(
+  id: string,
+  input: { dueDays?: number } = {},
+): Promise<{ document: DocumentRecord; billedMinutes: number; entries: number }> {
+  return apiRequest<{ document: DocumentRecord; billedMinutes: number; entries: number }>(
+    `/projects/${id}/bill`,
+    { method: 'POST', body: input },
+  );
 }

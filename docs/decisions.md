@@ -367,3 +367,32 @@ A new category is one edit in both places, not a string typed in a screen.
 The plan's storage decision is that receipt photos never reach the server; uploading them would
 also need a paid bucket or a second file API. The expense keeps the vendor, date, amount and note,
 which is what the totals need, and a receipt can stay in the phone's photos.
+
+## 24 November 2026 — Week 10
+
+### Time is an immutable snapshot, billing is a draft
+
+A time entry stores the rate it was worked at, so a later rate change cannot silently reprice past
+work. Billing only ever produces a **draft**: the lines are grouped by description and rate, each
+line keeps the entry ids that made it, and every entry records the draft it is on. Until the draft
+is issued it can be deleted, and deleting releases those entries to unbilled — which is why billed
+entries refuse edits and deletes. A wrong number is fixed by deleting the draft, correcting the
+time, and billing again.
+
+### Project writes follow the client permission
+
+The permission list has `projects:read` but no `projects:write`, and projects are the same kind of
+administrative record as clients, so writes reuse `clients:write` (owner and staff). Tracking time
+has its own `time:write`, which staff also hold; a viewer sees projects, totals and invoices but
+cannot add hours.
+
+### Projects are archived, not deleted, once they carry work
+
+A project with time or invoices returns 409 on delete and can be set to archived. That keeps
+invoices that reference the project resolvable and makes the time ledger auditable. Only an unused
+project can be removed.
+
+### The invoice editor still picks its client, not its project
+
+Billing a project sets the project on the draft it creates; invoices written by hand keep their
+existing client snapshot. An optional project picker in the editor is a later, smaller change.

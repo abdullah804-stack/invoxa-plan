@@ -29,7 +29,7 @@ npm run dev:api      # Fastify API on PORT (default 4000)
 npm run dev:mobile   # Expo app (Expo Go or a dev build)
 ```
 
-### API (M2–M9)
+### API (M2–M10)
 
 Base path `/api/v1`. All routes except `register`, `login` and `health` need
 `Authorization: Bearer <jwt>`; business routes read `X-Business-Id` (first business if absent)
@@ -46,6 +46,8 @@ and `X-Timezone`.
 | AI        | `POST /ai/draft` (a sentence in, a validated draft suggestion out; no document is written)                                                   |
 | Reminders | `GET /reminders` (overdue and due-soon sent invoices inside the business warning window)                                                     |
 | Recurring | `GET`/`POST /recurring`, `GET`/`PUT`/`DELETE /recurring/:id`, `POST /recurring/run` (idempotent; job secret or a signed-in user)             |
+| Projects  | `GET`/`POST /projects`, `GET`/`PUT`/`DELETE /projects/:id`, `POST /projects/:id/bill` (unbilled time into one draft invoice)                 |
+| Time      | `GET`/`POST /time-entries`, `PUT`/`DELETE /time-entries/:id` (unbilled entries only)                                                         |
 | Extras    | `GET`/`POST /saved-items`, `DELETE /saved-items/:id`                                                                                         |
 
 Errors always use `{ "error": { "code", "message", "details": [] } }`. A record in another
@@ -68,7 +70,7 @@ Until both exist the run skips with a warning instead of failing. GitHub can del
 scheduled run, so the endpoint stays idempotent and the app calls it on open as well; a workflow is
 also disabled after 60 days without repository activity.
 
-### Mobile (M4–M9)
+### Mobile (M4–M10)
 
 Expo Router app with an auth gate, SecureStore session, light and dark theme tokens, a three-step
 brand setup, a document editor with live shared totals, document detail actions and the client

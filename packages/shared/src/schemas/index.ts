@@ -10,3 +10,4 @@ export * from './api.js';
 export * from './ai.js';
 export * from './recurring.js';
 export * from './expense.js';
+export * from './project.js';

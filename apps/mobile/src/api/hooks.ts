@@ -1,15 +1,20 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from '../auth/SessionProvider';
 import {
+  billProjectTime,
   createClient,
   createDocument,
+  createExpense,
+  createProject,
+  createRecurring,
   createSavedItem,
+  createTimeEntry,
   deleteClient,
   deleteDocument,
-  createExpense,
-  createRecurring,
   deleteExpense,
+  deleteProject,
   deleteRecurring,
+  deleteTimeEntry,
   draftWithAi,
   duplicateDocument,
   fetchReminders,
@@ -18,13 +23,16 @@ import {
   fetchDocument,
   fetchExpense,
   fetchProfile,
+  fetchProject,
   fetchSummary,
   issueDocument,
   listClients,
   listDocuments,
   listExpenses,
+  listProjects,
   listRecurring,
   listSavedItems,
+  listTimeEntries,
   recordPayment,
   removeLogo,
   runRecurring,
@@ -33,6 +41,7 @@ import {
   updateDocument,
   updateExpense,
   updateProfile,
+  updateProject,
   updateRecurring,
   uploadLogo,
   type ClientInput,
@@ -47,7 +56,10 @@ import type {
   ExpenseInput,
   PaymentInput,
   Profile,
+  ProjectInput,
+  ProjectStatus,
   RecurringSchedule,
+  TimeEntryInput,
 } from './types';
 
 /**
@@ -70,6 +82,11 @@ export const queryKeys = {
   expenses: (businessId: string | null, params: { category?: ExpenseCategory }) =>
     ['expenses', businessId, params] as const,
   expense: (businessId: string | null, id: string) => ['expense', businessId, id] as const,
+  projects: (businessId: string | null, params: { status?: ProjectStatus; clientId?: string }) =>
+    ['projects', businessId, params] as const,
+  project: (businessId: string | null, id: string) => ['project', businessId, id] as const,
+  timeEntries: (businessId: string | null, projectId: string) =>
+    ['time-entries', businessId, projectId] as const,
 };
 
 export function useProfile() {
@@ -79,6 +96,92 @@ export function useProfile() {
     queryFn: fetchProfile,
     enabled: status === 'signedIn' && Boolean(activeBusinessId),
     staleTime: 30_000,
+  });
+}
+
+export function useProjects(params: { status?: ProjectStatus; clientId?: string } = {}) {
+  const { status, activeBusinessId } = useSession();
+  return useQuery({
+    queryKey: queryKeys.projects(activeBusinessId, params),
+    queryFn: () => listProjects(params),
+    enabled: status === 'signedIn' && Boolean(activeBusinessId),
+  });
+}
+
+export function useProject(id: string | undefined) {
+  const { status, activeBusinessId } = useSession();
+  return useQuery({
+    queryKey: queryKeys.project(activeBusinessId, id ?? ''),
+    queryFn: () => fetchProject(id as string),
+    enabled: status === 'signedIn' && Boolean(activeBusinessId) && Boolean(id),
+  });
+}
+
+function useProjectInvalidation(id?: string) {
+  const queryClient = useQueryClient();
+  const { activeBusinessId } = useSession();
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: ['projects', activeBusinessId] });
+    if (id)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.project(activeBusinessId, id) });
+    void queryClient.invalidateQueries({ queryKey: ['time-entries', activeBusinessId] });
+  };
+}
+
+export function useCreateProject() {
+  const invalidate = useProjectInvalidation();
+  return useMutation({
+    mutationFn: (input: ProjectInput) => createProject(input),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateProject(id: string) {
+  const invalidate = useProjectInvalidation(id);
+  return useMutation({
+    mutationFn: (input: Partial<ProjectInput>) => updateProject(id, input),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteProject() {
+  const invalidate = useProjectInvalidation();
+  return useMutation({ mutationFn: (id: string) => deleteProject(id), onSuccess: invalidate });
+}
+
+export function useTimeEntries(projectId: string | undefined) {
+  const { status, activeBusinessId } = useSession();
+  return useQuery({
+    queryKey: queryKeys.timeEntries(activeBusinessId, projectId ?? ''),
+    queryFn: () => listTimeEntries({ projectId: projectId as string, limit: 200 }),
+    enabled: status === 'signedIn' && Boolean(activeBusinessId) && Boolean(projectId),
+  });
+}
+
+export function useCreateTimeEntry(projectId: string) {
+  const invalidate = useProjectInvalidation(projectId);
+  return useMutation({
+    mutationFn: (input: TimeEntryInput) => createTimeEntry(input),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteTimeEntry(projectId: string) {
+  const invalidate = useProjectInvalidation(projectId);
+  return useMutation({ mutationFn: (id: string) => deleteTimeEntry(id), onSuccess: invalidate });
+}
+
+export function useBillProjectTime(projectId: string) {
+  const invalidate = useProjectInvalidation(projectId);
+  const queryClient = useQueryClient();
+  const { activeBusinessId } = useSession();
+  return useMutation({
+    mutationFn: () => billProjectTime(projectId),
+    onSuccess: () => {
+      invalidate();
+      void queryClient.invalidateQueries({ queryKey: ['documents', activeBusinessId] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.summary(activeBusinessId) });
+    },
   });
 }
 

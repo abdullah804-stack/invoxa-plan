@@ -243,7 +243,7 @@ export interface DocumentDraftBody {
     address?: string | null;
     taxId?: string | null;
   };
-  source?: 'manual' | 'prompt' | 'voice' | 'recurring' | 'duplicate' | 'estimate';
+  source?: 'manual' | 'prompt' | 'voice' | 'recurring' | 'duplicate' | 'estimate' | 'time';
   items: DocumentDraftItemInput[];
   currency: string;
   discount?: { type: 'percent'; valueBp: number } | { type: 'fixed'; valueMinor: number } | null;
@@ -380,4 +380,88 @@ export interface ExpenseListResponse {
   expenses: Expense[];
   totals: ExpenseTotal[];
   month: { from: string; to: string; totals: ExpenseTotal[] };
+}
+
+export type ProjectStatus = 'active' | 'completed' | 'archived';
+
+export interface Project {
+  id: string;
+  name: string;
+  clientId: string | null;
+  clientName: string | null;
+  status: ProjectStatus;
+  currency: string;
+  hourlyRateMinor: number | null;
+  budgetMinor: number | null;
+  startDate: string | null;
+  dueDate: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface ProjectTime {
+  minutes: number;
+  billableMinutes: number;
+  unbilledMinutes: number;
+  valueMinor: number;
+  unbilledValueMinor: number;
+}
+
+export interface TimeEntry {
+  id: string;
+  projectId: string;
+  date: string;
+  minutes: number;
+  description: string;
+  hourlyRateMinor: number;
+  currency: string;
+  billable: boolean;
+  billedDocumentId: string | null;
+  createdAt: string;
+}
+
+export interface ProjectDocumentSummary {
+  id: string;
+  number: string | null;
+  docType: 'invoice' | 'estimate' | 'credit_note';
+  status: 'draft' | 'sent' | 'paid' | 'void';
+  issueDate: string | null;
+  currency: string;
+  total: number;
+  paid: number;
+  dueDate: string | null;
+  createdAt: string;
+}
+
+export interface ProjectDetailResponse {
+  project: Project;
+  time: ProjectTime;
+  entries: TimeEntry[];
+  documents: ProjectDocumentSummary[];
+}
+
+export interface ProjectInput {
+  name: string;
+  clientId?: string;
+  status: ProjectStatus;
+  currency: string;
+  hourlyRateMinor?: number;
+  budgetMinor?: number;
+  startDate?: string;
+  dueDate?: string;
+  notes?: string;
+}
+
+export interface TimeEntryInput {
+  projectId: string;
+  date: string;
+  minutes: number;
+  description: string;
+  hourlyRateMinor: number;
+  billable: boolean;
+}
+
+export interface TimeEntryListResponse {
+  entries: TimeEntry[];
+  totals: ProjectTime;
 }

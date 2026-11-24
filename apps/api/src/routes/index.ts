@@ -10,6 +10,7 @@ import { healthRoutes } from './health.js';
 import { profileRoutes } from './profile.js';
 import { recurringRoutes } from './recurring.js';
 import { reminderRoutes } from './reminders.js';
+import { projectRoutes } from './projects.js';
 import { reportRoutes } from './reports.js';
 import { savedItemRoutes } from './savedItems.js';
 
@@ -27,6 +28,7 @@ export async function registerRoutes(app: FastifyInstance, config: ApiConfig): P
       await api.register(recurringRoutes, { config });
       await api.register(reminderRoutes, { config });
       await api.register(expenseRoutes, { config });
+      await api.register(projectRoutes, { config });
     },
     { prefix: API_BASE_PATH },
   );

@@ -36,6 +36,7 @@ import {
   totalsFor,
   type DocumentDocument,
 } from '../services/documents.js';
+import { TimeEntry } from '../models/project.js';
 import { assignDocumentNumber } from '../services/numbering.js';
 import { requireAction, resolveTenant, type TenantContext } from '../tenant.js';
 import { parseOrThrow } from '../validation.js';
@@ -396,6 +397,11 @@ export const documentRoutes: FastifyPluginAsync<DocumentRouteOptions> = async (a
       throw errors.forbidden('You can only delete your own drafts');
     }
 
+    // Billed time goes back to unbilled so it can be put on another invoice.
+    await TimeEntry.updateMany(
+      { business: doc.business, billedDocumentId: doc._id },
+      { $unset: { billedDocumentId: 1 } },
+    );
     await doc.deleteOne();
     return reply.code(204).send();
   });

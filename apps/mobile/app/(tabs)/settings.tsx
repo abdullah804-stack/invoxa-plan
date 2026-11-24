@@ -34,6 +34,7 @@ export default function SettingsScreen() {
   const canEditBrand = activeRole ? can(activeRole, 'brand:update') : false;
   const canManageReminders = activeRole ? can(activeRole, 'business:update') : false;
   const canRepeat = activeRole ? can(activeRole, 'drafts:create') : false;
+  const canSeeProjects = activeRole ? can(activeRole, 'projects:read') : false;
   const version = Constants.expoConfig?.version ?? '0.1.0';
 
   const [remindersEnabled, setRemindersEnabled] = useState(true);
@@ -189,6 +190,29 @@ export default function SettingsScreen() {
                 Reminders are local to this phone. Nothing is emailed.
               </Text>
             </Card>
+          </View>
+        ) : null}
+
+        {canSeeProjects ? (
+          <View style={styles.section}>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Work</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Projects"
+              onPress={() => router.push('/projects')}
+            >
+              <Card style={styles.card}>
+                <View style={styles.row}>
+                  <View style={styles.rowText}>
+                    <Text style={[styles.rowTitle, { color: colors.text }]}>Projects</Text>
+                    <Text style={[styles.rowSubtitle, { color: colors.textMuted }]}>
+                      Budgets, hourly rates and tracked time.
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.accent} />
+                </View>
+              </Card>
+            </Pressable>
           </View>
         ) : null}
 

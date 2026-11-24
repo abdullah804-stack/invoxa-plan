@@ -36,6 +36,7 @@ export const documentSourceSchema = z.enum([
   'recurring',
   'duplicate',
   'estimate',
+  'time',
 ]);
 
 export const templateSchema = z.enum(['classic', 'modern', 'minimal']);
