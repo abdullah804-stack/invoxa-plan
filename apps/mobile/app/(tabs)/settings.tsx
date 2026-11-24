@@ -13,6 +13,7 @@ import { Screen } from '../../src/components/Screen';
 import { Segmented } from '../../src/components/Segmented';
 import { TextField } from '../../src/components/TextField';
 import { errorMessage } from '../../src/lib/errors';
+import { amountToInput, parseAmountToMinor } from '../../src/lib/money';
 import { ensureNotificationPermission } from '../../src/lib/reminders';
 import { spacing, typeScale, type ThemeMode } from '../../src/theme/tokens';
 import { useTheme } from '../../src/theme/ThemeProvider';
@@ -21,6 +22,11 @@ const LANGUAGE_OPTIONS: { value: SupportedLanguage; label: string }[] = [
   { value: 'en', label: 'English' },
   { value: 'es', label: 'Español' },
   { value: 'fr', label: 'Français' },
+];
+
+const LATE_FEE_OPTIONS: { value: 'percent' | 'fixed'; label: string }[] = [
+  { value: 'percent', label: 'Percent' },
+  { value: 'fixed', label: 'Fixed amount' },
 ];
 
 const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
@@ -40,7 +46,7 @@ export default function SettingsScreen() {
   const canEditBrand = activeRole ? can(activeRole, 'brand:update') : false;
   const canManageReminders = activeRole ? can(activeRole, 'business:update') : false;
   const canRepeat = activeRole ? can(activeRole, 'drafts:create') : false;
-  const canSeeProjects = activeRole ? can(activeRole, 'projects:read') : false;
+  const canManageLateFee = activeRole ? can(activeRole, 'lateFee:configure') : false;
   const version = Constants.expoConfig?.version ?? '0.1.0';
 
   const [remindersEnabled, setRemindersEnabled] = useState(true);
@@ -49,6 +55,13 @@ export default function SettingsScreen() {
   const [reminderNotice, setReminderNotice] = useState<string | null>(null);
   const [language, setLanguage] = useState<SupportedLanguage>('en');
   const [languageNotice, setLanguageNotice] = useState<string | null>(null);
+  const [lateFeeEnabled, setLateFeeEnabled] = useState(false);
+  const [lateFeeType, setLateFeeType] = useState<'percent' | 'fixed'>('percent');
+  const [lateFeeValue, setLateFeeValue] = useState('');
+  const [lateFeeGrace, setLateFeeGrace] = useState('0');
+  const [lateFeeNotice, setLateFeeNotice] = useState<string | null>(null);
+
+  const currency = business?.currency ?? 'USD';
 
   useEffect(() => {
     const reminders = business?.reminders;
@@ -57,6 +70,60 @@ export default function SettingsScreen() {
     setReminderHour(String(reminders.hour));
     setReminderDays(String(reminders.daysBefore));
   }, [business?.id, business?.reminders]);
+
+  useEffect(() => {
+    const rule = business?.lateFee;
+    if (!rule) return;
+    setLateFeeEnabled(rule.enabled);
+    setLateFeeType(rule.type);
+    setLateFeeValue(
+      rule.type === 'percent'
+        ? rule.value > 0
+          ? String(rule.value / 100)
+          : ''
+        : amountToInput(rule.value, business?.currency ?? 'USD'),
+    );
+    setLateFeeGrace(String(rule.graceDays));
+  }, [business?.id, business?.lateFee, business?.currency]);
+
+  const saveLateFee = async () => {
+    setLateFeeNotice(null);
+    const days = Number(lateFeeGrace.trim());
+    if (!Number.isInteger(days) || days < 0 || days > 365) {
+      setLateFeeNotice('Choose 0 to 365 grace days');
+      return;
+    }
+
+    let value: number;
+    if (lateFeeType === 'percent') {
+      const percent = Number(lateFeeValue.trim().replace(',', '.'));
+      if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
+        setLateFeeNotice('Enter a percentage from 0 to 100');
+        return;
+      }
+      value = Math.round(percent * 100);
+    } else {
+      const minor = parseAmountToMinor(lateFeeValue, currency);
+      if (minor === null) {
+        setLateFeeNotice('Enter a fee amount');
+        return;
+      }
+      value = minor;
+    }
+
+    try {
+      await updateProfile.mutateAsync({
+        lateFee: { enabled: lateFeeEnabled, type: lateFeeType, value, graceDays: days },
+      });
+      setLateFeeNotice(
+        lateFeeEnabled
+          ? 'Saved. Late fees are never added automatically; you confirm each one.'
+          : 'Saved. Late fees are off.',
+      );
+    } catch (error) {
+      setLateFeeNotice(errorMessage(error));
+    }
+  };
 
   useEffect(() => {
     const saved = business?.language;
@@ -238,26 +305,61 @@ export default function SettingsScreen() {
           </View>
         ) : null}
 
-        {canSeeProjects ? (
+        {canManageLateFee ? (
           <View style={styles.section}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Work</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Projects"
-              onPress={() => router.push('/projects')}
-            >
-              <Card style={styles.card}>
-                <View style={styles.row}>
-                  <View style={styles.rowText}>
-                    <Text style={[styles.rowTitle, { color: colors.text }]}>Projects</Text>
-                    <Text style={[styles.rowSubtitle, { color: colors.textMuted }]}>
-                      Budgets, hourly rates and tracked time.
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={colors.accent} />
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Late fees</Text>
+            <Card style={styles.card}>
+              <View style={styles.row}>
+                <View style={styles.rowText}>
+                  <Text style={[styles.rowTitle, { color: colors.text }]}>Optional late fee</Text>
+                  <Text style={[styles.rowSubtitle, { color: colors.textMuted }]}>
+                    Off by default. You still confirm each fee on the invoice.
+                  </Text>
                 </View>
-              </Card>
-            </Pressable>
+                <Switch
+                  value={lateFeeEnabled}
+                  onValueChange={setLateFeeEnabled}
+                  accessibilityLabel="Late fee enabled"
+                  trackColor={{ true: colors.accentSoft, false: colors.surfaceMuted }}
+                  thumbColor={lateFeeEnabled ? colors.accent : colors.surface}
+                />
+              </View>
+              <Segmented
+                options={LATE_FEE_OPTIONS}
+                value={lateFeeType}
+                onChange={setLateFeeType}
+                accessibilityLabel="Late fee type"
+              />
+              <View style={styles.reminderFields}>
+                <View style={styles.reminderField}>
+                  <TextField
+                    label={lateFeeType === 'percent' ? 'Percent' : `Amount (${currency})`}
+                    value={lateFeeValue}
+                    onChangeText={setLateFeeValue}
+                    keyboardType="decimal-pad"
+                    placeholder={lateFeeType === 'percent' ? '1.5' : '0.00'}
+                  />
+                </View>
+                <View style={styles.reminderField}>
+                  <TextField
+                    label="Grace days"
+                    value={lateFeeGrace}
+                    onChangeText={setLateFeeGrace}
+                    keyboardType="number-pad"
+                    maxLength={3}
+                  />
+                </View>
+              </View>
+              <Button
+                title="Save late fee"
+                variant="secondary"
+                onPress={() => void saveLateFee()}
+                loading={updateProfile.isPending}
+              />
+              {lateFeeNotice ? (
+                <Text style={[styles.hint, { color: colors.textMuted }]}>{lateFeeNotice}</Text>
+              ) : null}
+            </Card>
           </View>
         ) : null}
 

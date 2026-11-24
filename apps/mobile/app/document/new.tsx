@@ -24,6 +24,7 @@ import {
   useCreateDocument,
   useCreateSavedItem,
   useDocument,
+  useExpenses,
   useProfile,
   useProject,
   useSavedItems,
@@ -63,6 +64,8 @@ interface ItemDraft {
   discount: string;
   /** Kept when the line came from tracked time, so saving keeps the link. */
   timeEntryIds?: string[];
+  /** Kept when the line carries a billable expense. */
+  expenseIds?: string[];
 }
 
 const DOC_TYPE_OPTIONS: { value: DocType; label: string }[] = [
@@ -158,10 +161,12 @@ export default function DocumentEditorScreen() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [savedOpen, setSavedOpen] = useState(false);
   const [projectOpen, setProjectOpen] = useState(false);
+  const [expensesOpen, setExpensesOpen] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [addTime, setAddTime] = useState(true);
 
   const projectDetail = useProject(projectId ?? undefined);
+  const unbilledExpenses = useExpenses({ unbilled: 'true' });
 
   const canSaveItems = activeRole ? can(activeRole, 'savedItems:write') : false;
   const canSeeProjects = activeRole ? can(activeRole, 'projects:read') : false;
@@ -198,6 +203,7 @@ export default function DocumentEditorScreen() {
         unitPrice: amountToInput(item.unitPrice, docCurrency),
         discount: item.discountBp ? String(item.discountBp / 100) : '',
         ...(item.timeEntryIds?.length ? { timeEntryIds: item.timeEntryIds } : {}),
+        ...(item.expenseIds?.length ? { expenseIds: item.expenseIds } : {}),
       })),
     );
     if (document.discount) {
@@ -280,6 +286,21 @@ export default function DocumentEditorScreen() {
     setSavedOpen(false);
   };
 
+  const addExpenseLine = (description: string, amount: number, id: string) => {
+    setItems((current) => [
+      ...current.filter((item) => item.description.trim() !== '' || item.unitPrice.trim() !== ''),
+      {
+        key: blankItem().key,
+        description,
+        quantity: '1',
+        unitPrice: amountToInput(amount, currency),
+        discount: '',
+        expenseIds: [id],
+      },
+    ]);
+    setExpensesOpen(false);
+  };
+
   const saveLine = (item: ItemDraft) => {
     const description = item.description.trim();
     const unitPrice = parseAmountToMinor(item.unitPrice, currency);
@@ -324,6 +345,7 @@ export default function DocumentEditorScreen() {
           unitPrice,
           ...(discountBp > 0 ? { discountBp } : {}),
           ...(item.timeEntryIds?.length ? { timeEntryIds: item.timeEntryIds } : {}),
+          ...(item.expenseIds?.length ? { expenseIds: item.expenseIds } : {}),
         });
       }
     });
@@ -397,6 +419,10 @@ export default function DocumentEditorScreen() {
 
   const savedForCurrency = (savedItems.data?.savedItems ?? []).filter(
     (item) => item.currency === currency,
+  );
+  const unbilledForCurrency = (unbilledExpenses.data?.expenses ?? []).filter(
+    (expense) =>
+      expense.currency === currency && !items.some((item) => item.expenseIds?.includes(expense.id)),
   );
 
   return (
@@ -594,14 +620,24 @@ export default function DocumentEditorScreen() {
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Lines</Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Saved line items"
-                    onPress={() => setSavedOpen(true)}
-                    hitSlop={8}
-                  >
-                    <Text style={[styles.link, { color: colors.accent }]}>Saved items</Text>
-                  </Pressable>
+                  <View style={styles.headerLinks}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Add a billable expense"
+                      onPress={() => setExpensesOpen(true)}
+                      hitSlop={8}
+                    >
+                      <Text style={[styles.link, { color: colors.accent }]}>Expenses</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Saved line items"
+                      onPress={() => setSavedOpen(true)}
+                      hitSlop={8}
+                    >
+                      <Text style={[styles.link, { color: colors.accent }]}>Saved items</Text>
+                    </Pressable>
+                  </View>
                 </View>
 
                 {items.map((item, index) => (
@@ -813,6 +849,50 @@ export default function DocumentEditorScreen() {
         }}
       />
 
+      <Sheet
+        visible={expensesOpen}
+        title="Billable expenses"
+        onClose={() => setExpensesOpen(false)}
+      >
+        {unbilledExpenses.isLoading ? (
+          <View style={styles.sheetCentered}>
+            <ActivityIndicator color={colors.accent} />
+          </View>
+        ) : unbilledExpenses.isError ? (
+          <Text style={[styles.muted, { color: colors.danger }]}>
+            {errorMessage(unbilledExpenses.error)}
+          </Text>
+        ) : unbilledForCurrency.length === 0 ? (
+          <Text style={[styles.muted, { color: colors.textMuted }]}>
+            No unbilled expenses in {currency}. Mark an expense as billable to see it here.
+          </Text>
+        ) : (
+          unbilledForCurrency.map((expense) => (
+            <Pressable
+              key={expense.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Add ${expense.description}`}
+              onPress={() => addExpenseLine(expense.description, expense.amount, expense.id)}
+              style={[
+                styles.savedRow,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <View style={styles.clientText}>
+                <Text style={[styles.clientName, { color: colors.text }]} numberOfLines={1}>
+                  {expense.description}
+                </Text>
+                <Text style={[styles.clientHint, { color: colors.textMuted }]}>
+                  {amountToInput(expense.amount, expense.currency)} {expense.currency}
+                  {expense.vendor ? ` · ${expense.vendor}` : ''}
+                </Text>
+              </View>
+              <Ionicons name="add" size={18} color={colors.accent} />
+            </Pressable>
+          ))
+        )}
+      </Sheet>
+
       <Sheet visible={savedOpen} title="Saved items" onClose={() => setSavedOpen(false)}>
         {savedItems.isLoading ? (
           <View style={styles.sheetCentered}>
@@ -904,6 +984,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  headerLinks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
   },
   sectionLabel: {
     ...typeScale.small,

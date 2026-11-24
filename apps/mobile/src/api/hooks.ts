@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from '../auth/SessionProvider';
 import {
+  applyLateFee,
   billProjectTime,
   createClient,
   createDocument,
@@ -15,8 +16,10 @@ import {
   deleteProject,
   deleteRecurring,
   deleteTimeEntry,
+  discardTimer,
   draftWithAi,
   duplicateDocument,
+  fetchExpenseReport,
   fetchReminders,
   fetchBrandAsset,
   fetchClient,
@@ -25,6 +28,7 @@ import {
   fetchProfile,
   fetchProject,
   fetchSummary,
+  fetchTimer,
   issueDocument,
   listClients,
   listDocuments,
@@ -36,7 +40,10 @@ import {
   recordPayment,
   removeLogo,
   runRecurring,
+  scanReceipt,
   setDocumentStatus,
+  startTimer,
+  stopTimer,
   updateClient,
   updateDocument,
   updateExpense,
@@ -58,6 +65,7 @@ import type {
   Profile,
   ProjectInput,
   ProjectStatus,
+  ReceiptScanResult,
   RecurringSchedule,
   TimeEntryInput,
 } from './types';
@@ -79,8 +87,13 @@ export const queryKeys = {
   brandAsset: (businessId: string | null, id: string) => ['brand-asset', businessId, id] as const,
   reminders: (businessId: string | null) => ['reminders', businessId] as const,
   recurring: (businessId: string | null) => ['recurring', businessId] as const,
-  expenses: (businessId: string | null, params: { category?: ExpenseCategory }) =>
-    ['expenses', businessId, params] as const,
+  expenses: (
+    businessId: string | null,
+    params: { category?: ExpenseCategory; unbilled?: 'true' | 'false' },
+  ) => ['expenses', businessId, params] as const,
+  expenseReport: (businessId: string | null, params: { from?: string; to?: string }) =>
+    ['expense-report', businessId, params] as const,
+  timer: (businessId: string | null) => ['timer', businessId] as const,
   expense: (businessId: string | null, id: string) => ['expense', businessId, id] as const,
   projects: (businessId: string | null, params: { status?: ProjectStatus; clientId?: string }) =>
     ['projects', businessId, params] as const,
@@ -185,7 +198,9 @@ export function useBillProjectTime(projectId: string) {
   });
 }
 
-export function useExpenses(params: { category?: ExpenseCategory } = {}) {
+export function useExpenses(
+  params: { category?: ExpenseCategory; unbilled?: 'true' | 'false' } = {},
+) {
   const { status, activeBusinessId } = useSession();
   return useQuery({
     queryKey: queryKeys.expenses(activeBusinessId, params),
@@ -232,6 +247,68 @@ export function useUpdateExpense(id: string) {
 export function useDeleteExpense() {
   const invalidate = useExpenseInvalidation();
   return useMutation({ mutationFn: (id: string) => deleteExpense(id), onSuccess: invalidate });
+}
+
+export function useExpenseReport(params: { from?: string; to?: string } = {}) {
+  const { status, activeBusinessId } = useSession();
+  return useQuery({
+    queryKey: queryKeys.expenseReport(activeBusinessId, params),
+    queryFn: () => fetchExpenseReport(params),
+    enabled: status === 'signedIn' && Boolean(activeBusinessId),
+  });
+}
+
+export function useTimer() {
+  const { status, activeBusinessId } = useSession();
+  return useQuery({
+    queryKey: queryKeys.timer(activeBusinessId),
+    queryFn: fetchTimer,
+    enabled: status === 'signedIn' && Boolean(activeBusinessId),
+    refetchInterval: 60_000,
+  });
+}
+
+function useTimerInvalidation() {
+  const queryClient = useQueryClient();
+  const { activeBusinessId } = useSession();
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.timer(activeBusinessId) });
+    void queryClient.invalidateQueries({ queryKey: ['time-entries', activeBusinessId] });
+    void queryClient.invalidateQueries({ queryKey: ['projects', activeBusinessId] });
+  };
+}
+
+export function useStartTimer() {
+  const invalidate = useTimerInvalidation();
+  return useMutation({
+    mutationFn: (input: { projectId: string; description?: string }) => startTimer(input),
+    onSuccess: invalidate,
+  });
+}
+
+export function useStopTimer() {
+  const invalidate = useTimerInvalidation();
+  return useMutation({ mutationFn: () => stopTimer(), onSuccess: invalidate });
+}
+
+export function useDiscardTimer() {
+  const invalidate = useTimerInvalidation();
+  return useMutation({ mutationFn: () => discardTimer(), onSuccess: invalidate });
+}
+
+export function useScanReceipt() {
+  return useMutation({
+    mutationFn: (image: string): Promise<{ receipt: ReceiptScanResult; remaining: number }> =>
+      scanReceipt(image),
+  });
+}
+
+export function useApplyLateFee() {
+  const onDocumentChange = useDocumentCacheUpdates();
+  return useMutation({
+    mutationFn: (id: string) => applyLateFee(id),
+    onSuccess: (result) => onDocumentChange(result.document),
+  });
 }
 
 export function useReminders() {

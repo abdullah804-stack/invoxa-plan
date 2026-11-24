@@ -35,6 +35,8 @@ function serialize(expense: ExpenseDocument) {
     currency: expense.currency,
     taxMinor: expense.taxMinor ?? 0,
     notes: expense.notes ?? null,
+    billable: expense.billable ?? false,
+    billedDocumentId: expense.billedDocumentId ? String(expense.billedDocumentId) : null,
     createdAt: expense.createdAt?.toISOString() ?? new Date().toISOString(),
   };
 }
@@ -89,6 +91,10 @@ export const expenseRoutes: FastifyPluginAsync<ExpenseRouteOptions> = async (app
       };
     }
     if (query.category) filter['category'] = query.category;
+    if (query.unbilled === 'true') {
+      filter['billable'] = true;
+      filter['billedDocumentId'] = { $exists: false };
+    }
 
     const expenses = await scoped(Expense, context).findSorted(
       filter,
@@ -133,6 +139,9 @@ export const expenseRoutes: FastifyPluginAsync<ExpenseRouteOptions> = async (app
     requireAction(context, 'expenses:write');
 
     const expense = await loadExpense(context, paramId(request));
+    if (expense.billedDocumentId) {
+      throw errors.conflict('That expense is already on an invoice');
+    }
     const input = parseOrThrow(expenseUpdateSchema, request.body ?? {});
 
     for (const [key, value] of Object.entries(input)) {
@@ -150,6 +159,9 @@ export const expenseRoutes: FastifyPluginAsync<ExpenseRouteOptions> = async (app
     requireAction(context, 'expenses:write');
 
     const expense = await loadExpense(context, paramId(request));
+    if (expense.billedDocumentId) {
+      throw errors.conflict('That expense is already on an invoice');
+    }
     await expense.deleteOne();
     return reply.code(204).send();
   });

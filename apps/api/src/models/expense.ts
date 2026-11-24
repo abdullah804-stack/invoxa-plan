@@ -20,6 +20,9 @@ const expenseSchema = new Schema(
     currency: { type: String, required: true },
     taxMinor: { type: Number },
     notes: { type: String },
+    /** Only a billable expense can be put on an invoice, and only once. */
+    billable: { type: Boolean, default: false },
+    billedDocumentId: { type: Schema.Types.ObjectId, ref: 'Document' },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
   },
   {
@@ -30,6 +33,7 @@ const expenseSchema = new Schema(
 
 expenseSchema.index({ business: 1, date: -1 });
 expenseSchema.index({ business: 1, category: 1, date: -1 });
+expenseSchema.index({ business: 1, billedDocumentId: 1 });
 
 export type ExpenseRecord = InferSchemaType<typeof expenseSchema>;
 export const Expense = model('Expense', expenseSchema);

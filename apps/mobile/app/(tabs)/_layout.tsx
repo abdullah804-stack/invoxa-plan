@@ -50,6 +50,15 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="work"
+        options={{
+          title: 'Work',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="briefcase-outline" size={size} color={String(color)} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="expenses"
         options={{
           title: 'Expenses',

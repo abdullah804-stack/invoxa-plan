@@ -47,6 +47,15 @@ export default function ExpensesScreen() {
       >
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.text }]}>Expenses</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Expense report"
+            onPress={() => router.push('/expense/report')}
+            hitSlop={8}
+            style={styles.reportLink}
+          >
+            <Text style={[styles.reportText, { color: colors.accent }]}>Report</Text>
+          </Pressable>
           {canWrite ? (
             <Pressable
               accessibilityRole="button"
@@ -157,6 +166,13 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typeScale.title,
+    flex: 1,
+  },
+  reportLink: {
+    paddingHorizontal: spacing.xs,
+  },
+  reportText: {
+    ...typeScale.small,
   },
   addButton: {
     width: 40,

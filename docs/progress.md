@@ -324,3 +324,35 @@ bundles. No screen was clicked here, because no phone is attached to this worksp
       another business's project
 
 **Done when:** a draft started by hand can bill a project's tracked time without leaving the editor.
+
+## M12 — Expenses onto invoices, timer and late fees (week 12) — built
+
+- [x] Expenses gained a `billable` toggle and a `billedDocumentId`; `GET /expenses?unbilled=true`
+      lists what can be billed, and a billed expense refuses edits and deletes (409)
+- [x] A draft line carries `expenseIds`: saving the draft marks those expenses as billed, releases
+      any no longer on a line, and deleting the draft releases them all
+- [x] Non-billable, foreign-currency and already-billed expenses are refused before a draft is made;
+      another business's expense is 404
+- [x] One server-side timer per person (`GET /timer`, `POST /timer/start`, `POST /timer/stop`,
+      `DELETE /timer`); stopping banks a time entry at the project rate with the business rounding
+      (none, 5 or 15 minutes, never below one minute)
+- [x] `POST /ai/scan-receipt`: a shrunk photo in, validated expense fields out, image discarded, no
+      expense created until the user confirms; shares the AI daily cap
+- [x] The expense form can scan a receipt, shows the "photo not saved or synced" note, and has a
+      Billable switch; the invoice editor's Lines header offers unbilled expenses as lines
+- [x] Optional late fees (off by default): Settings → Late fees configures the rule and grace days,
+      `POST /invoices/:id/late-fee` adds one owner-confirmed adjustment computed from the balance
+- [x] The invoice screen shows the fee amount before confirming; the plan's vector (132000 at
+      150 bp = 1980) is a test
+- [x] Expense report: `GET /reports/expenses` per category and currency, with a screen from the
+      Expenses tab
+- [x] Work tab: running timer, project picker, active projects with rates, and the archived list;
+      projects moved out of Settings
+- [x] New shared tests for the fee vector and rounding; 7 new API tests for billing expenses,
+      refusals, timer rounding, late-fee rules/permissions, receipt scanning, the report
+
+**Done when:** a scanned receipt becomes a billed line item, a tracked day becomes an invoice line,
+and the late-fee test vector passes — the API side is verified with a stubbed Gemini client and a
+real database. What is verified: 99 shared tests, 98 API tests, strict TypeScript, ESLint, Prettier,
+and Android and web Metro bundles. No receipt photo was sent to Google (no `GEMINI_API_KEY` here) and
+no screen was clicked, because no phone is attached to this workspace.

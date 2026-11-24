@@ -16,6 +16,8 @@ export const lineItemSchema = new Schema(
     unit: { type: String, trim: true },
     /** The tracked time this line was grouped from, so it can be released again. */
     timeEntryIds: { type: [String] },
+    /** The billable expenses this line carries, so they can be released again. */
+    expenseIds: { type: [String] },
   },
   { _id: false },
 );

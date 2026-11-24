@@ -5,6 +5,7 @@ import {
   DOCUMENT_TITLES,
   formatDate,
   formatMoney,
+  lateFeeAmount,
   type StoredDocumentStatus,
 } from '@invoxa/shared';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,10 +23,12 @@ import {
   View,
 } from 'react-native';
 import {
+  useApplyLateFee,
   useDeleteDocument,
   useDocument,
   useDuplicateDocument,
   useIssueDocument,
+  useProfile,
   useRecordPayment,
   useSetDocumentStatus,
 } from '../../src/api/hooks';
@@ -71,6 +74,9 @@ export default function DocumentDetailScreen() {
   const statusChange = useSetDocumentStatus();
   const duplicate = useDuplicateDocument();
   const removeDocument = useDeleteDocument();
+  const applyLateFee = useApplyLateFee();
+  const profile = useProfile();
+  const lateFeeRule = profile.data?.business.lateFee;
 
   const [notice, setNotice] = useState<string | null>(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
@@ -88,6 +94,7 @@ export default function DocumentDetailScreen() {
   const canDuplicate = activeRole ? can(activeRole, 'documents:duplicate') : false;
   const canVoid = activeRole ? can(activeRole, 'documents:void') : false;
   const canEdit = activeRole ? can(activeRole, 'drafts:create') : false;
+  const canApplyLateFee = activeRole ? can(activeRole, 'lateFee:apply') : false;
 
   // Line nets come from the same shared totals function the server uses.
   const lineNets = useMemo(() => {
@@ -107,6 +114,34 @@ export default function DocumentDetailScreen() {
       return [];
     }
   }, [document]);
+
+  const hasLateFee = Boolean(
+    document?.adjustments.some((adjustment) => adjustment.type === 'late_fee'),
+  );
+  const lateFeePreview =
+    document && lateFeeRule
+      ? lateFeeAmount({ type: lateFeeRule.type, value: lateFeeRule.value }, document.totals.balance)
+      : 0;
+
+  const addLateFee = () => {
+    if (!document) return;
+    Alert.alert(
+      'Add a late fee?',
+      `${formatMoney(lateFeePreview, document.currency)} will be added to what the client owes. This can only be done once.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Add fee',
+          onPress: () =>
+            applyLateFee.mutate(document.id, {
+              onSuccess: (result) =>
+                setNotice(`Late fee of ${formatMoney(result.amount, document.currency)} added.`),
+              onError: (error) => setNotice(errorMessage(error)),
+            }),
+        },
+      ],
+    );
+  };
 
   const openPayment = () => {
     if (!document) return;
@@ -441,6 +476,20 @@ export default function DocumentDetailScreen() {
             ) : null}
 
             <View style={styles.actions}>
+              {status === 'sent' &&
+              document.docType === 'invoice' &&
+              canApplyLateFee &&
+              lateFeeRule?.enabled &&
+              !hasLateFee &&
+              document.totals.balance > 0 ? (
+                <Button
+                  title={`Add late fee (${formatMoney(lateFeePreview, document.currency)})`}
+                  variant="secondary"
+                  onPress={addLateFee}
+                  loading={applyLateFee.isPending}
+                />
+              ) : null}
+
               {status === 'draft' && canIssue ? (
                 <Button title="Issue document" onPress={issueDocument} loading={issue.isPending} />
               ) : null}

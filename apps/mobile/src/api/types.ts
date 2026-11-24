@@ -86,6 +86,8 @@ export interface DocumentLineItem {
   unit?: string;
   /** Tracked time this line was grouped from, when it was pulled from a project. */
   timeEntryIds?: string[];
+  /** Billable expenses this line carries. */
+  expenseIds?: string[];
 }
 
 export interface DocumentBrandSnapshot {
@@ -364,6 +366,8 @@ export interface Expense {
   currency: string;
   taxMinor: number;
   notes: string | null;
+  billable: boolean;
+  billedDocumentId: string | null;
   createdAt: string;
 }
 
@@ -376,6 +380,33 @@ export interface ExpenseInput {
   currency: string;
   taxMinor?: number;
   notes?: string;
+  billable?: boolean;
+}
+
+export interface ReceiptScanResult {
+  vendor?: string;
+  date?: string;
+  description: string;
+  category: ExpenseCategory;
+  amount: number;
+  taxMinor?: number;
+  currency: string;
+}
+
+export interface ExpenseReport {
+  from: string | null;
+  to: string | null;
+  totals: { currency: string; amount: number; count: number }[];
+  categories: { category: ExpenseCategory; currency: string; amount: number; count: number }[];
+}
+
+export interface Timer {
+  id: string;
+  projectId: string;
+  projectName: string;
+  description: string | null;
+  startedAt: string;
+  elapsedMinutes: number;
 }
 
 export interface ExpenseTotal {

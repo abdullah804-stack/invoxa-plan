@@ -452,3 +452,42 @@ A project bills in one currency and belongs to at most one client, so saving a d
 in another currency is a validation error on `projectId`, and so is a project whose client differs
 from the chosen one. A project outside the business is a 404, like every other tenant lookup. The
 picker only offers active projects, narrowed to the chosen client when there is one.
+
+## 24 November 2026 — Week 12
+
+### Billable expenses ride on the invoice line that carries them
+
+An expense is still its own record, but marking it billable lets a draft line carry its id in
+`expenseIds`. The server reads those ids from the lines, checks that each expense is billable, is in
+the draft's currency, and is not already on another draft, then marks it with this draft. Any expense
+billed to the draft but no longer referenced by a line goes back to unbilled, so removing a line can
+never strand a receipt. Deleting the draft releases them all, the same rule billed time already used.
+
+### The timer lives on the server, one per person
+
+A timer on the phone would lose its start time with a dead battery or a second device, so it is one
+document per business and person: start, stop or discard. Stopping banks an ordinary time entry at
+the project's rate, with the business's 5- or 15-minute rounding applied once; a tracked minute is
+never rounded to nothing. The Work tab is the place for it, and projects moved there from Settings.
+
+### Receipt photos are read once and dropped
+
+`POST /ai/scan-receipt` takes one already-shrunk JPEG data URL, asks Gemini for vendor, date,
+description, category, total and tax, converts the amounts to minor units in code, and returns a
+suggestion. The image is never written to the database, a log or a file, and no expense exists until
+the user reviews the form and saves it. Scanning shares the drafting daily cap, so the free tier
+cannot be doubled by using both features.
+
+### A late fee is one owner-confirmed adjustment
+
+Late fees are off by default. The business rule is a percentage in basis points or a fixed amount,
+plus grace days; the server, not the request, computes the fee from the invoice balance, refuses to
+add a second one, and refuses a document that is still inside its grace period. The app shows the
+amount in the confirmation so nobody applies a fee blind, and the fee is a normal adjustment the
+renderer already prints.
+
+### The expense report never adds currencies together
+
+`GET /reports/expenses` returns totals per currency and per category, with a count, for a date
+range. Adding dollars to euros would produce a number that means nothing, so every currency is its
+own row, as on the dashboard.

@@ -16,6 +16,7 @@ import type {
   ExpenseCategory,
   ExpenseInput,
   ExpenseListResponse,
+  ExpenseReport,
   PaymentInput,
   Profile,
   Project,
@@ -27,8 +28,10 @@ import type {
   TimeEntryListResponse,
   RecurringSchedule,
   ReminderList,
+  ReceiptScanResult,
   SavedItem,
   Summary,
+  Timer,
   User,
 } from './types';
 
@@ -53,6 +56,8 @@ export interface ProfileUpdate {
   website?: string;
   currency?: string;
   language?: string;
+  timeRounding?: 'none' | '5' | '15';
+  lateFee?: { enabled: boolean; type: 'percent' | 'fixed'; value: number; graceDays: number };
   branding?: {
     color: string;
     template?: 'classic' | 'modern' | 'minimal';
@@ -293,6 +298,7 @@ export function listExpenses(
     from?: string;
     to?: string;
     category?: ExpenseCategory;
+    unbilled?: 'true' | 'false';
     limit?: number;
   } = {},
 ): Promise<ExpenseListResponse> {
@@ -301,6 +307,7 @@ export function listExpenses(
       from: params.from,
       to: params.to,
       category: params.category,
+      unbilled: params.unbilled,
       limit: params.limit,
     },
   });
@@ -392,4 +399,50 @@ export function billProjectTime(
     `/projects/${id}/bill`,
     { method: 'POST', body: input },
   );
+}
+
+export function fetchTimer(): Promise<{ timer: Timer | null }> {
+  return apiRequest<{ timer: Timer | null }>('/timer');
+}
+
+export function startTimer(input: {
+  projectId: string;
+  description?: string;
+}): Promise<{ timer: Timer }> {
+  return apiRequest<{ timer: Timer }>('/timer/start', { method: 'POST', body: input });
+}
+
+export function stopTimer(): Promise<{ entry: TimeEntry; minutes: number }> {
+  return apiRequest<{ entry: TimeEntry; minutes: number }>('/timer/stop', {
+    method: 'POST',
+    body: {},
+  });
+}
+
+export function discardTimer(): Promise<void> {
+  return apiRequest<void>('/timer', { method: 'DELETE' });
+}
+
+export function scanReceipt(
+  image: string,
+): Promise<{ receipt: ReceiptScanResult; remaining: number }> {
+  return apiRequest<{ receipt: ReceiptScanResult; remaining: number }>('/ai/scan-receipt', {
+    method: 'POST',
+    body: { image },
+  });
+}
+
+export function applyLateFee(id: string): Promise<{ document: DocumentRecord; amount: number }> {
+  return apiRequest<{ document: DocumentRecord; amount: number }>(`/invoices/${id}/late-fee`, {
+    method: 'POST',
+    body: {},
+  });
+}
+
+export function fetchExpenseReport(
+  params: { from?: string; to?: string } = {},
+): Promise<ExpenseReport> {
+  return apiRequest<ExpenseReport>('/reports/expenses', {
+    query: { from: params.from, to: params.to },
+  });
 }

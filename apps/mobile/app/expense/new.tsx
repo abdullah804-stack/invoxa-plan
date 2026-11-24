@@ -9,6 +9,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from 'react-native';
@@ -17,6 +18,7 @@ import {
   useDeleteExpense,
   useExpense,
   useProfile,
+  useScanReceipt,
   useUpdateExpense,
 } from '../../src/api/hooks';
 import { Button } from '../../src/components/Button';
@@ -27,6 +29,7 @@ import { Skeleton } from '../../src/components/Skeleton';
 import { TextField } from '../../src/components/TextField';
 import { errorMessage } from '../../src/lib/errors';
 import { amountToInput, parseAmountToMinor } from '../../src/lib/money';
+import { pickReceiptDataUrl } from '../../src/lib/receipt';
 import { spacing, typeScale } from '../../src/theme/tokens';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import type { ExpenseCategory } from '../../src/api/types';
@@ -48,6 +51,7 @@ export default function ExpenseFormScreen() {
   const create = useCreateExpense();
   const update = useUpdateExpense(id ?? '');
   const remove = useDeleteExpense();
+  const scan = useScanReceipt();
 
   const currency = profile.data?.business.currency ?? 'USD';
 
@@ -57,6 +61,8 @@ export default function ExpenseFormScreen() {
   const [vendor, setVendor] = useState('');
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
+  const [billable, setBillable] = useState(false);
+  const [scanNotice, setScanNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -68,9 +74,30 @@ export default function ExpenseFormScreen() {
     setVendor(current.vendor ?? '');
     setAmount(amountToInput(current.amount, current.currency));
     setNotes(current.notes ?? '');
+    setBillable(current.billable);
   }, [expense.data]);
 
   const busy = create.isPending || update.isPending || remove.isPending;
+  const billed = Boolean(id && expense.data?.expense.billedDocumentId);
+
+  // The photo is read once and dropped; only these fields are kept.
+  const scanPhoto = async () => {
+    setScanNotice(null);
+    try {
+      const image = await pickReceiptDataUrl();
+      if (!image) return;
+      const result = await scan.mutateAsync(image);
+      const receipt = result.receipt;
+      setDescription(receipt.description);
+      setVendor(receipt.vendor ?? '');
+      setAmount(amountToInput(receipt.amount, receipt.currency));
+      setCategory(receipt.category);
+      if (receipt.date) setDate(receipt.date);
+      setScanNotice('Filled from the receipt. The photo was not saved or synced.');
+    } catch (caught) {
+      setScanNotice(errorMessage(caught));
+    }
+  };
 
   const save = async () => {
     setError(null);
@@ -94,6 +121,7 @@ export default function ExpenseFormScreen() {
       description: description.trim(),
       amount: minor,
       currency,
+      billable,
       ...(vendor.trim() ? { vendor: vendor.trim() } : {}),
       ...(notes.trim() ? { notes: notes.trim() } : {}),
     };
@@ -164,6 +192,16 @@ export default function ExpenseFormScreen() {
             </Card>
           ) : (
             <>
+              <Button
+                title="Scan a receipt"
+                variant="secondary"
+                onPress={() => void scanPhoto()}
+                loading={scan.isPending}
+              />
+              {scanNotice ? (
+                <Text style={[styles.hint, { color: colors.textMuted }]}>{scanNotice}</Text>
+              ) : null}
+
               <TextField
                 label="What was it for?"
                 value={description}
@@ -204,6 +242,22 @@ export default function ExpenseFormScreen() {
                 hint="The day the money was spent"
               />
 
+              <View style={styles.toggleRow}>
+                <View style={styles.field}>
+                  <Text style={[styles.label, { color: colors.textMuted }]}>Billable</Text>
+                  <Text style={[styles.hint, { color: colors.textMuted }]}>
+                    Can be added to a client&apos;s invoice as a line.
+                  </Text>
+                </View>
+                <Switch
+                  value={billable}
+                  onValueChange={setBillable}
+                  accessibilityLabel="Billable expense"
+                  trackColor={{ true: colors.accentSoft, false: colors.surfaceMuted }}
+                  thumbColor={billable ? colors.accent : colors.surface}
+                />
+              </View>
+
               <TextField
                 label="Paid to (optional)"
                 value={vendor}
@@ -225,25 +279,30 @@ export default function ExpenseFormScreen() {
 
               {id && expense.data ? (
                 <Text style={[styles.hint, { color: colors.textMuted }]}>
-                  Saved as {formatMoney(expense.data.expense.amount, expense.data.expense.currency)}
-                  . Editing changes every total that includes it.
+                  {billed
+                    ? 'This expense is on an invoice. Delete that draft to change it again.'
+                    : `Saved as ${formatMoney(expense.data.expense.amount, expense.data.expense.currency)}. Editing changes every total that includes it.`}
                 </Text>
               ) : null}
 
-              <Button
-                title={id ? 'Save changes' : 'Add expense'}
-                onPress={() => void save()}
-                loading={busy}
-              />
+              {billed ? null : (
+                <>
+                  <Button
+                    title={id ? 'Save changes' : 'Add expense'}
+                    onPress={() => void save()}
+                    loading={busy}
+                  />
 
-              {id ? (
-                <Button
-                  title="Delete expense"
-                  variant="ghost"
-                  onPress={confirmDelete}
-                  loading={remove.isPending}
-                />
-              ) : null}
+                  {id ? (
+                    <Button
+                      title="Delete expense"
+                      variant="ghost"
+                      onPress={confirmDelete}
+                      loading={remove.isPending}
+                    />
+                  ) : null}
+                </>
+              )}
             </>
           )}
         </ScrollView>
@@ -299,5 +358,10 @@ const styles = StyleSheet.create({
   },
   hint: {
     ...typeScale.small,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
   },
 });

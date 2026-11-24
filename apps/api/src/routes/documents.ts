@@ -6,6 +6,7 @@ import {
   can,
   canTransition,
   documentInputSchema,
+  lateFeeAmount,
   documentListQuerySchema,
   documentUpdateSchema,
   dueDateIsValid,
@@ -23,6 +24,7 @@ import { authenticate } from '../auth/authenticate.js';
 import { errors } from '../errors.js';
 import { Business } from '../models/business.js';
 import { Client } from '../models/client.js';
+import { Expense } from '../models/expense.js';
 import { Document, type DocumentRecord } from '../models/document.js';
 import { decodeCursor, encodeCursor, escapeRegex } from '../pagination.js';
 import { scoped } from '../scoped.js';
@@ -184,6 +186,71 @@ async function releaseProjectTime(doc: DocumentDocument): Promise<void> {
   const ids = derived.flatMap((item) => item.timeEntryIds ?? []);
   if (ids.length > 0) filter['_id'] = { $in: ids };
   await TimeEntry.updateMany(filter, { $unset: { billedDocumentId: 1 } });
+}
+
+/**
+ * Expenses travel on the lines that carry their ids. A referenced expense is
+ * checked and billed to the draft; one that is no longer referenced goes back to
+ * unbilled, so removing a line never strands a receipt. Validation happens before
+ * anything is written, because a new draft is created before this runs.
+ */
+async function referencedExpenses(
+  currency: string,
+  items: Array<{ expenseIds?: string[] | null }>,
+  context: TenantContext,
+  docId?: string,
+): Promise<Types.ObjectId[]> {
+  const raw = [...new Set(items.flatMap((item) => item.expenseIds ?? []))];
+  const ids = raw.filter((id) => Types.ObjectId.isValid(id)).map((id) => new Types.ObjectId(id));
+  if (ids.length === 0) return [];
+
+  const expenses = (await scoped(Expense, context).find(
+    { _id: { $in: ids } },
+    ids.length,
+  )) as unknown as Array<{
+    _id: Types.ObjectId;
+    billable?: boolean;
+    currency: string;
+    billedDocumentId?: Types.ObjectId | null;
+  }>;
+  if (expenses.length !== ids.length) {
+    throw errors.notFound();
+  }
+
+  for (const expense of expenses) {
+    if (!expense.billable) {
+      throw errors.validation([
+        { path: 'items', message: 'Only billable expenses can go on an invoice' },
+      ]);
+    }
+    if (expense.currency !== currency) {
+      throw errors.validation([
+        { path: 'items', message: `That expense is in ${expense.currency}` },
+      ]);
+    }
+    if (expense.billedDocumentId && String(expense.billedDocumentId) !== String(docId ?? '')) {
+      throw errors.conflict('That expense is already on another invoice');
+    }
+  }
+
+  return ids;
+}
+
+async function setExpenseBilling(doc: DocumentDocument, ids: Types.ObjectId[]): Promise<void> {
+  if (ids.length > 0) {
+    await Expense.updateMany(
+      { business: doc.business, _id: { $in: ids } },
+      { $set: { billedDocumentId: doc._id } },
+    );
+  }
+  await Expense.updateMany(
+    {
+      business: doc.business,
+      billedDocumentId: doc._id,
+      ...(ids.length > 0 ? { _id: { $nin: ids } } : {}),
+    },
+    { $unset: { billedDocumentId: 1 } },
+  );
 }
 
 async function markTimeBilled(doc: DocumentDocument, ids: Types.ObjectId[]): Promise<void> {
@@ -359,6 +426,7 @@ export const documentRoutes: FastifyPluginAsync<DocumentRouteOptions> = async (a
 
     const project = input.projectId ? await draftProject(context, input.projectId) : null;
     if (project) assertProjectFits(project, input.currency, client?._id ?? input.clientId);
+    const expenseIds = await referencedExpenses(input.currency, input.items, context);
 
     const doc = await documents.create({
       clientUuid: input.clientUuid,
@@ -378,6 +446,7 @@ export const documentRoutes: FastifyPluginAsync<DocumentRouteOptions> = async (a
         ...(item.timeEntryIds && item.timeEntryIds.length > 0
           ? { timeEntryIds: item.timeEntryIds }
           : {}),
+        ...(item.expenseIds && item.expenseIds.length > 0 ? { expenseIds: item.expenseIds } : {}),
       })),
       currency: input.currency,
       discount:
@@ -406,6 +475,7 @@ export const documentRoutes: FastifyPluginAsync<DocumentRouteOptions> = async (a
     applyTotals(doc);
     await doc.save();
     await markTimeBilled(doc, billed);
+    await setExpenseBilling(doc, expenseIds);
 
     return reply.code(201).send({ document: serializeDocument(doc, requestToday(request)) });
   });
@@ -489,8 +559,15 @@ export const documentRoutes: FastifyPluginAsync<DocumentRouteOptions> = async (a
         ...(item.timeEntryIds && item.timeEntryIds.length > 0
           ? { timeEntryIds: item.timeEntryIds }
           : {}),
+        ...(item.expenseIds && item.expenseIds.length > 0 ? { expenseIds: item.expenseIds } : {}),
       })) as typeof doc.items;
     }
+    const expenseIds = await referencedExpenses(
+      doc.currency,
+      doc.items ?? [],
+      context,
+      String(doc._id),
+    );
     if (input.currency !== undefined) doc.currency = input.currency;
     if (input.discount !== undefined) {
       doc.discount =
@@ -518,6 +595,7 @@ export const documentRoutes: FastifyPluginAsync<DocumentRouteOptions> = async (a
     applyTotals(doc);
     await doc.save();
     await markTimeBilled(doc, billed);
+    await setExpenseBilling(doc, expenseIds);
 
     return { document: serializeDocument(doc, requestToday(request)) };
   });
@@ -535,13 +613,78 @@ export const documentRoutes: FastifyPluginAsync<DocumentRouteOptions> = async (a
       throw errors.forbidden('You can only delete your own drafts');
     }
 
-    // Billed time goes back to unbilled so it can be put on another invoice.
+    // Billed time and expenses go back to unbilled so they can be used again.
     await TimeEntry.updateMany(
+      { business: doc.business, billedDocumentId: doc._id },
+      { $unset: { billedDocumentId: 1 } },
+    );
+    await Expense.updateMany(
       { business: doc.business, billedDocumentId: doc._id },
       { $unset: { billedDocumentId: 1 } },
     );
     await doc.deleteOne();
     return reply.code(204).send();
+  });
+
+  /**
+   * A late fee is one stored adjustment, added by an owner after the due date
+   * and grace days. The amount comes from the business rule, never the request.
+   */
+  app.post('/invoices/:id/late-fee', { preHandler: authenticateRequest }, async (request) => {
+    const context = await resolveTenant(request);
+    requireAction(context, 'lateFee:apply');
+
+    const doc = await loadDocument(context, paramId(request));
+    const business = await Business.findById(context.businessId);
+    if (!business) {
+      throw errors.notFound();
+    }
+
+    const rule = business.lateFee;
+    if (!rule?.enabled) {
+      throw errors.validation([], 'Late fees are off for this business');
+    }
+    if (doc.docType !== 'invoice' || doc.status !== 'sent') {
+      throw errors.conflict('Late fees only apply to sent invoices');
+    }
+    if ((doc.adjustments ?? []).some((adjustment) => adjustment.type === 'late_fee')) {
+      throw errors.conflict('This invoice already has a late fee');
+    }
+    if (!doc.dueDate) {
+      throw errors.conflict('This invoice has no due date');
+    }
+
+    const today = requestToday(request);
+    const eligibleFrom = addDays(doc.dueDate, rule.graceDays ?? 0);
+    if (today <= eligibleFrom) {
+      throw errors.validation([], `A late fee can be added after ${eligibleFrom}`);
+    }
+
+    const balance = totalsFor(doc).balance;
+    if (balance <= 0) {
+      throw errors.conflict('Nothing is due on this invoice');
+    }
+    const amount = lateFeeAmount({ type: rule.type ?? 'percent', value: rule.value ?? 0 }, balance);
+    if (amount <= 0) {
+      throw errors.validation([], 'The late-fee rule comes to nothing');
+    }
+
+    doc.adjustments = [
+      ...(doc.adjustments ?? []),
+      {
+        id: newLineItemId(),
+        type: 'late_fee',
+        amount,
+        ...(rule.type === 'percent' ? { basisPoints: rule.value ?? 0 } : {}),
+        appliedAt: today,
+        appliedBy: new Types.ObjectId(context.userId),
+        effectiveDate: today,
+      },
+    ] as typeof doc.adjustments;
+    applyTotals(doc);
+    await doc.save();
+
+    return { document: serializeDocument(doc, today), amount };
   });
 
   /** Issue assigns the number atomically and freezes client and brand copies. */

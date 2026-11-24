@@ -1,10 +1,13 @@
 import {
   aiDraftSuggestionSchema,
+  EXPENSE_CATEGORY_LABELS,
   majorToMinor,
   percentToBasisPoints,
+  receiptScanResultSchema,
   redactPersonalData,
   type AiDraftSuggestion,
   type DocumentType,
+  type ReceiptScanResult,
   type TaxMode,
 } from '@invoxa/shared';
 import { AppError } from '../errors.js';
@@ -165,6 +168,194 @@ function extractText(payload: unknown): string | null {
   if (!Array.isArray(parts) || parts.length === 0) return null;
   const first = parts[0];
   return isRecord(first) && typeof first['text'] === 'string' ? first['text'] : null;
+}
+
+const RECEIPT_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    vendor: { type: 'STRING' },
+    date: { type: 'STRING' },
+    description: { type: 'STRING' },
+    category: { type: 'STRING' },
+    amount: { type: 'NUMBER' },
+    tax: { type: 'NUMBER' },
+  },
+  required: ['description', 'amount'],
+} as const;
+
+const CATEGORIES = Object.keys(EXPENSE_CATEGORY_LABELS);
+
+interface ReceiptRequest {
+  apiKey: string;
+  model: string;
+  /** A PNG or JPEG data URL, resized by the phone. Never stored. */
+  image: string;
+  currency: string;
+  language: string;
+}
+
+function isoDateOrUndefined(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const text = value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return undefined;
+  const year = Number(text.slice(0, 4));
+  const month = Number(text.slice(5, 7));
+  const day = Number(text.slice(8, 10));
+  const check = new Date(Date.UTC(year, month - 1, day));
+  return check.getUTCFullYear() === year &&
+    check.getUTCMonth() === month - 1 &&
+    check.getUTCDate() === day
+    ? text
+    : undefined;
+}
+
+function receiptInstruction(input: ReceiptRequest): string {
+  return [
+    'You read a photo of a purchase receipt for a small business expense.',
+    'Reply with JSON only, matching the response schema. Never write prose.',
+    `Amounts are decimal amounts in ${input.currency}, not cents.`,
+    `Write the description and vendor in ${input.language}.`,
+    `- category must be one of: ${CATEGORIES.join(', ')}.`,
+    '- amount is the total actually paid, including tax. tax is the tax part when shown.',
+    '- date is the calendar date on the receipt as YYYY-MM-DD; omit it when unreadable.',
+    '- description is what was bought, short and specific.',
+    '- Do not invent a vendor, date, tax amount or total that is not printed.',
+  ].join('\n');
+}
+
+/**
+ * Receipt extraction. The photo is sent once, in one request, and no copy is
+ * written to the database, a log or a file: only the fields the user confirms.
+ */
+export async function requestReceiptScan(input: ReceiptRequest): Promise<ReceiptScanResult> {
+  const match = /^data:(image\/[a-z]+);base64,(.+)$/i.exec(input.image);
+  const mime = match?.[1] ?? '';
+  const data = match?.[2] ?? '';
+  if (!mime || !data) {
+    throw new AppError('AI_FAILED', 'Send a PNG or JPEG photo of the receipt.');
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(`${ENDPOINT}/${encodeURIComponent(input.model)}:generateContent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': input.apiKey,
+      },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: receiptInstruction(input) }] },
+        contents: [
+          {
+            role: 'user',
+            parts: [{ inline_data: { mime_type: mime, data } }, { text: 'Read this receipt.' }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 512,
+          responseMimeType: 'application/json',
+          responseSchema: RECEIPT_SCHEMA,
+        },
+      }),
+      signal: controller.signal,
+    });
+  } catch {
+    throw new AppError(
+      'AI_FAILED',
+      controller.signal.aborted
+        ? 'Reading the receipt took too long. Try again.'
+        : 'The assistant could not be reached. Try again.',
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!response.ok) {
+    throw new AppError(
+      'AI_FAILED',
+      response.status === 429
+        ? 'The assistant is busy right now. Try again in a minute.'
+        : 'That receipt could not be read. Try again.',
+    );
+  }
+
+  let text: string | null = null;
+  try {
+    text = extractText(await response.json());
+  } catch {
+    text = null;
+  }
+
+  const raw = text ? parseJsonObject(text) : null;
+  if (!raw) {
+    throw new AppError('AI_FAILED', 'The receipt reply could not be read. Try a clearer photo.');
+  }
+
+  const amountMajor = Number(raw['amount']);
+  if (!Number.isFinite(amountMajor) || amountMajor <= 0) {
+    throw new AppError('AI_FAILED', 'The total on that receipt could not be read.');
+  }
+
+  let amount: number;
+  try {
+    amount = majorToMinor(Math.min(amountMajor, 1_000_000_000), input.currency);
+  } catch {
+    throw new AppError('AI_FAILED', 'The total on that receipt could not be read.');
+  }
+
+  const taxMajor = Number(raw['tax']);
+  let taxMinor = 0;
+  if (Number.isFinite(taxMajor) && taxMajor > 0) {
+    try {
+      taxMinor = Math.min(amount, majorToMinor(Math.min(taxMajor, 1_000_000_000), input.currency));
+    } catch {
+      taxMinor = 0;
+    }
+  }
+
+  const categoryRaw =
+    typeof raw['category'] === 'string' ? raw['category'].trim().toLowerCase() : '';
+  const category = CATEGORIES.includes(categoryRaw) ? categoryRaw : 'other';
+  const vendor =
+    typeof raw['vendor'] === 'string' && raw['vendor'].trim()
+      ? raw['vendor'].trim().slice(0, 200)
+      : undefined;
+  const description =
+    typeof raw['description'] === 'string' && raw['description'].trim()
+      ? raw['description'].trim().slice(0, 500)
+      : (vendor ?? 'Receipt');
+  const date = isoDateOrUndefined(raw['date']);
+
+  const parsed = receiptScanResultSchema.safeParse({
+    description,
+    category,
+    amount,
+    currency: input.currency,
+    ...(vendor ? { vendor } : {}),
+    ...(date ? { date } : {}),
+    ...(taxMinor > 0 ? { taxMinor } : {}),
+  });
+  if (!parsed.success) {
+    throw new AppError('AI_FAILED', 'The receipt could not be read. Try a clearer photo.');
+  }
+
+  return parsed.data;
+}
+
+function parseJsonObject(reply: string): Record<string, unknown> | null {
+  const start = reply.indexOf('{');
+  const end = reply.lastIndexOf('}');
+  if (start === -1 || end <= start) return null;
+  try {
+    const raw: unknown = JSON.parse(reply.slice(start, end + 1));
+    return isRecord(raw) ? raw : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function requestAiDraft(input: DraftRequest): Promise<AiDraftSuggestion> {

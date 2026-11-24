@@ -158,6 +158,7 @@ export function serializeDocument(doc: DocumentDocument, today: string) {
       ...(item.timeEntryIds && item.timeEntryIds.length > 0
         ? { timeEntryIds: item.timeEntryIds }
         : {}),
+      ...(item.expenseIds && item.expenseIds.length > 0 ? { expenseIds: item.expenseIds } : {}),
     })),
     currency: doc.currency,
     discount: serializeDiscount(doc.discount),

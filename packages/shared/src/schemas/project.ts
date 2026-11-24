@@ -60,6 +60,14 @@ export const timeEntryListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(500).default(200),
 });
 
+export const timerStartSchema = z.object({
+  projectId: z.string().trim().min(1).max(64),
+  /** What is being worked on; becomes the time entry's description. */
+  description: optionalText(500),
+});
+
+export type TimerStart = z.infer<typeof timerStartSchema>;
+
 export const billTimeSchema = z.object({
   /** Optional payment terms; defaults to the business terms. */
   dueDays: z.number().int().min(0).max(90).optional(),

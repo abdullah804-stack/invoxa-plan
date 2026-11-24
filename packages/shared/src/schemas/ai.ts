@@ -1,7 +1,12 @@
 import { z } from 'zod';
-import { currencySchema, documentTypeSchema, taxModeSchema } from './enums.js';
+import {
+  currencySchema,
+  documentTypeSchema,
+  expenseCategorySchema,
+  taxModeSchema,
+} from './enums.js';
 import { discountSchema } from './lineItem.js';
-import { minorUnitsSchema, optionalText } from './common.js';
+import { isoDateSchema, minorUnitsSchema, optionalText } from './common.js';
 
 /**
  * AI drafting (plan section "AI"). The model only ever produces a *suggestion*;
@@ -39,3 +44,35 @@ export const aiDraftSuggestionSchema = z.object({
 });
 
 export type AiDraftSuggestion = z.infer<typeof aiDraftSuggestionSchema>;
+
+/**
+ * Receipt scanning: the phone shrinks the photo and sends it once, the server
+ * extracts the fields and never stores the image. The result is a suggestion the
+ * user reviews and confirms before anything is saved.
+ */
+export const receiptScanRequestSchema = z.object({
+  /** A PNG or JPEG data URL, resized on the phone to keep the request small. */
+  image: z
+    .string()
+    .min(100)
+    .max(4_000_000)
+    .refine(
+      (value) => /^data:image\/(png|jpeg|jpg);base64,[A-Za-z0-9+/=]+$/.test(value),
+      'Send a PNG or JPEG image',
+    ),
+});
+
+export type ReceiptScanRequest = z.infer<typeof receiptScanRequestSchema>;
+
+export const receiptScanResultSchema = z.object({
+  vendor: optionalText(200),
+  date: isoDateSchema.optional(),
+  description: z.string().trim().min(1).max(500),
+  category: expenseCategorySchema,
+  /** Integer minor units in the business currency. */
+  amount: minorUnitsSchema.refine((value) => value > 0, 'The receipt has no usable total'),
+  taxMinor: minorUnitsSchema.optional(),
+  currency: currencySchema,
+});
+
+export type ReceiptScanResult = z.infer<typeof receiptScanResultSchema>;

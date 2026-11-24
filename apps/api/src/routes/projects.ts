@@ -6,9 +6,11 @@ import {
   projectInputSchema,
   projectListQuerySchema,
   projectUpdateSchema,
+  roundMinutes,
   timeEntryInputSchema,
   timeEntryListQuerySchema,
   timeEntryUpdateSchema,
+  timerStartSchema,
   type DocumentType,
 } from '@invoxa/shared';
 import type { ApiConfig } from '../config.js';
@@ -18,6 +20,7 @@ import { Business } from '../models/business.js';
 import { Client } from '../models/client.js';
 import { Document, type DocumentRecord } from '../models/document.js';
 import { Project, TimeEntry, type ProjectRecord, type TimeEntryRecord } from '../models/project.js';
+import { Timer } from '../models/timer.js';
 import {
   applyTotals,
   buildClientSnapshot,
@@ -101,6 +104,27 @@ function timeTotals(entries: TimeEntryRecord[]) {
   }
 
   return { minutes, billableMinutes, unbilledMinutes, valueMinor, unbilledValueMinor };
+}
+
+type TimerDocument = HydratedDocument<{
+  projectId: Types.ObjectId;
+  description?: string | null;
+  startedAt: Date;
+}>;
+
+function serializeTimer(
+  timer: TimerDocument,
+  project: ProjectDocument,
+  now = Date.now(),
+): Record<string, unknown> {
+  return {
+    id: String(timer._id),
+    projectId: String(timer.projectId),
+    projectName: project.name,
+    description: timer.description ?? null,
+    startedAt: timer.startedAt.toISOString(),
+    elapsedMinutes: Math.max(0, Math.floor((now - timer.startedAt.getTime()) / 60_000)),
+  };
 }
 
 async function loadProject(context: TenantContext, id: string): Promise<ProjectDocument> {
@@ -446,5 +470,93 @@ export const projectRoutes: FastifyPluginAsync<ProjectRouteOptions> = async (app
       billedMinutes: entries.reduce((sum, entry) => sum + entry.minutes, 0),
       entries: entries.length,
     };
+  });
+
+  /** One running timer per person, stored here so a phone restart cannot lose it. */
+  app.get('/timer', { preHandler: authenticateRequest }, async (request) => {
+    const context = await resolveTenant(request);
+    requireAction(context, 'projects:read');
+
+    const timer = (await scoped(Timer, context).findOne({
+      user: new Types.ObjectId(context.userId),
+    })) as TimerDocument | null;
+    if (!timer) return { timer: null };
+
+    const project = (await scoped(Project, context).findById(
+      String(timer.projectId),
+    )) as ProjectDocument | null;
+    if (!project) return { timer: null };
+
+    return { timer: serializeTimer(timer, project) };
+  });
+
+  app.post('/timer/start', { preHandler: authenticateRequest }, async (request, reply) => {
+    const context = await resolveTenant(request);
+    requireAction(context, 'time:write');
+
+    const input = parseOrThrow(timerStartSchema, request.body ?? {});
+    const project = await loadProject(context, input.projectId);
+    const running = await scoped(Timer, context).findOne({
+      user: new Types.ObjectId(context.userId),
+    });
+    if (running) {
+      throw errors.conflict('A timer is already running. Stop it first.');
+    }
+
+    const timer = (await scoped(Timer, context).create({
+      user: new Types.ObjectId(context.userId),
+      projectId: project._id,
+      ...(input.description ? { description: input.description } : {}),
+      startedAt: new Date(),
+    })) as unknown as TimerDocument;
+
+    return reply.code(201).send({ timer: serializeTimer(timer, project) });
+  });
+
+  /**
+   * Stopping banks the elapsed time as one ordinary time entry. The business
+   * rounding setting decides whether minutes become 5 or 15 minute blocks.
+   */
+  app.post('/timer/stop', { preHandler: authenticateRequest }, async (request) => {
+    const context = await resolveTenant(request);
+    requireAction(context, 'time:write');
+
+    const timer = (await scoped(Timer, context).findOne({
+      user: new Types.ObjectId(context.userId),
+    })) as TimerDocument | null;
+    if (!timer) {
+      throw errors.conflict('No timer is running');
+    }
+
+    const project = await loadProject(context, String(timer.projectId));
+    const business = await Business.findById(context.businessId);
+    const elapsed = Math.max(0, Math.floor((Date.now() - timer.startedAt.getTime()) / 60_000));
+    const minutes = roundMinutes(elapsed, business?.timeRounding ?? 'none');
+
+    const entry = await scoped(TimeEntry, context).create({
+      projectId: project._id,
+      date: requestToday(request),
+      minutes,
+      description: timer.description?.trim() || project.name,
+      hourlyRateMinor: project.hourlyRateMinor ?? 0,
+      currency: project.currency,
+      billable: true,
+      createdBy: new Types.ObjectId(context.userId),
+    });
+
+    await timer.deleteOne();
+
+    return { entry: serializeTimeEntry(entry as TimeEntryDocument), minutes };
+  });
+
+  app.delete('/timer', { preHandler: authenticateRequest }, async (request, reply) => {
+    const context = await resolveTenant(request);
+    requireAction(context, 'time:write');
+
+    await Timer.deleteOne({
+      business: new Types.ObjectId(context.businessId),
+      user: new Types.ObjectId(context.userId),
+    });
+    return reply.code(204).send();
   });
 };

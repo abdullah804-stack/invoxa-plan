@@ -20,6 +20,8 @@ export const expenseInputSchema = z.object({
   /** Optional tax part of the amount, for reclaiming it later. */
   taxMinor: minorUnitsSchema.optional(),
   notes: optionalText(2000),
+  /** Off by default: only a billable expense can be put on an invoice. */
+  billable: z.boolean().default(false),
 });
 
 export type ExpenseInput = z.infer<typeof expenseInputSchema>;
@@ -32,7 +34,17 @@ export const expenseListQuerySchema = z.object({
   from: isoDateSchema.optional(),
   to: isoDateSchema.optional(),
   category: expenseCategorySchema.optional(),
+  /** Billable expenses that are not on a draft yet. */
+  unbilled: z.enum(['true', 'false']).optional(),
   limit: z.coerce.number().int().min(1).max(200).default(100),
 });
 
 export type ExpenseListQuery = z.infer<typeof expenseListQuerySchema>;
+
+/** The expense report: what was spent per category and currency in a date range. */
+export const expenseReportQuerySchema = z.object({
+  from: isoDateSchema.optional(),
+  to: isoDateSchema.optional(),
+});
+
+export type ExpenseReportQuery = z.infer<typeof expenseReportQuerySchema>;
