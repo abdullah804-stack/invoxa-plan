@@ -1,4 +1,4 @@
-import type { InvoiceTemplate } from '@invoxa/shared';
+import type { InvoiceTemplate, SupportedLanguage } from '@invoxa/shared';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
@@ -43,6 +43,15 @@ const TEMPLATE_OPTIONS: { value: InvoiceTemplate; label: string }[] = [
   { value: 'minimal', label: 'Minimal' },
 ];
 
+const LANGUAGE_OPTIONS: { value: SupportedLanguage; label: string }[] = [
+  { value: 'en', label: 'English' },
+  { value: 'es', label: 'Español' },
+  { value: 'fr', label: 'Français' },
+];
+
+const isSupportedLanguage = (value: string): value is SupportedLanguage =>
+  value === 'en' || value === 'es' || value === 'fr';
+
 export default function OnboardingScreen() {
   const { colors } = useTheme();
   const router = useRouter();
@@ -61,6 +70,7 @@ export default function OnboardingScreen() {
   const [color, setColor] = useState(DEFAULT_BRAND_COLOR);
   const [hexInput, setHexInput] = useState(DEFAULT_BRAND_COLOR);
   const [template, setTemplate] = useState<InvoiceTemplate>('classic');
+  const [language, setLanguage] = useState<SupportedLanguage>('en');
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -76,6 +86,7 @@ export default function OnboardingScreen() {
     setColor(business.branding.color || DEFAULT_BRAND_COLOR);
     setHexInput(business.branding.color || DEFAULT_BRAND_COLOR);
     setTemplate(business.branding.template);
+    if (isSupportedLanguage(business.language)) setLanguage(business.language);
     setLogoDataUrl(profile.data.logo?.dataUrl ?? null);
     setHydrated(true);
   }, [profile.data, hydrated]);
@@ -105,10 +116,10 @@ export default function OnboardingScreen() {
         address,
         currency: business?.currency ?? 'USD',
         pageSize: business?.pageSize ?? 'A4',
-        language: business?.language ?? 'en',
+        language,
         fontPair: business?.branding.fontPair ?? 'manrope-inter',
       }),
-    [name, color, template, logoDataUrl, email, phone, address, business],
+    [name, color, template, logoDataUrl, email, phone, address, business, language],
   );
 
   // The preview only ever shows a logo the server has accepted, so a failed
@@ -159,7 +170,7 @@ export default function OnboardingScreen() {
         if (!saved) return;
       }
       if (step === 1) {
-        await updateProfile.mutateAsync({ branding: { color, template } });
+        await updateProfile.mutateAsync({ branding: { color, template }, language });
       }
       if (step === 2) {
         close();
@@ -346,6 +357,18 @@ export default function OnboardingScreen() {
                   onChange={setTemplate}
                   accessibilityLabel="Invoice template"
                 />
+                <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>
+                  Invoice language
+                </Text>
+                <Segmented
+                  options={LANGUAGE_OPTIONS}
+                  value={language}
+                  onChange={setLanguage}
+                  accessibilityLabel="Invoice language"
+                />
+                <Text style={[styles.hint, { color: colors.textMuted }]}>
+                  Invoices and PDFs print in this language. You can change it later in settings.
+                </Text>
               </Card>
 
               <Card style={styles.brandCard}>

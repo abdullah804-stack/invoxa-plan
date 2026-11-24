@@ -301,6 +301,8 @@ attached to this workspace — the visual and device checks for M4–M10 are sti
 - [x] Settings → Business has an Invoice language selector (owner or staff) that saves through the
       existing profile update; the language is already stored on the business and copied into each
       document's brand snapshot, so issued invoices keep theirs
+- [x] Onboarding's brand step offers the same language choice, saved with the brand update and
+      reflected in the live preview, so a new business starts in Spanish or French
 - [x] New tests: all three dictionaries share keys and none is blank, plus renderer checks for
       Spanish, French, a regional tag and an unsupported language
 

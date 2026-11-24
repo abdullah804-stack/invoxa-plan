@@ -420,3 +420,10 @@ language into their brand snapshot when they are created, so changing the settin
 invoices — an issued invoice is never reprinted in a different language. The app's own screens stay
 English in this milestone; translating the product UI is a larger, separate job from translating
 the invoice a client receives.
+
+### The invoice language is also picked during onboarding
+
+A new business chooses its invoice language on the brand step, next to the template, so the first
+invoice it sends can already be Spanish or French. The choice is saved with the same brand update
+and the live preview renders in it, so the effect is visible before the flow is finished. Settings
+keeps the same control for changing it later.
