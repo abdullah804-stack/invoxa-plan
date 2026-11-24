@@ -36,7 +36,7 @@ import {
   totalsFor,
   type DocumentDocument,
 } from '../services/documents.js';
-import { TimeEntry } from '../models/project.js';
+import { Project, TimeEntry } from '../models/project.js';
 import { assignDocumentNumber } from '../services/numbering.js';
 import { requireAction, resolveTenant, type TenantContext } from '../tenant.js';
 import { parseOrThrow } from '../validation.js';
@@ -87,6 +87,111 @@ function optionalObjectId(value: string | undefined) {
     throw errors.notFound();
   }
   return new Types.ObjectId(value);
+}
+
+interface DraftProject {
+  _id: Types.ObjectId;
+  currency: string;
+  clientId?: Types.ObjectId | null;
+}
+
+/** Loads a project for a draft, 404 for anything outside this business. */
+async function draftProject(context: TenantContext, projectId: string): Promise<DraftProject> {
+  const project = await scoped(Project, context).findById(projectId);
+  if (!project) {
+    throw errors.notFound();
+  }
+  return project as unknown as DraftProject;
+}
+
+/** A project can only bill into a draft for the same client and currency. */
+function assertProjectFits(project: DraftProject, currency: string, clientId: unknown): void {
+  if (project.currency !== currency) {
+    throw errors.validation([
+      { path: 'projectId', message: `This project bills in ${project.currency}` },
+    ]);
+  }
+  if (project.clientId && clientId && String(project.clientId) !== String(clientId)) {
+    throw errors.validation([
+      { path: 'projectId', message: 'This project belongs to another client' },
+    ]);
+  }
+}
+
+/**
+ * Adds a project's unbilled billable time to a draft as lines grouped by rate and
+ * description, and answers the entries to mark as billed once the draft is saved.
+ */
+export async function addProjectTime(
+  doc: DocumentDocument,
+  project: DraftProject,
+  context: TenantContext,
+): Promise<Types.ObjectId[]> {
+  assertProjectFits(project, doc.currency, doc.clientId);
+
+  const entries = (await scoped(TimeEntry, context).findSorted(
+    { projectId: project._id, billable: true, billedDocumentId: { $exists: false } },
+    { date: 1, createdAt: 1 },
+    500,
+  )) as unknown as Array<{
+    _id: Types.ObjectId;
+    minutes: number;
+    description: string;
+    hourlyRateMinor: number;
+  }>;
+  if (entries.length === 0) return [];
+
+  const groups = new Map<
+    string,
+    { description: string; minutes: number; rate: number; ids: string[] }
+  >();
+  for (const entry of entries) {
+    const key = `${entry.hourlyRateMinor}|${entry.description}`;
+    const group = groups.get(key) ?? {
+      description: entry.description,
+      minutes: 0,
+      rate: entry.hourlyRateMinor,
+      ids: [],
+    };
+    group.minutes += entry.minutes;
+    group.ids.push(String(entry._id));
+    groups.set(key, group);
+  }
+
+  const lines = [...groups.values()].map((group) => ({
+    id: newLineItemId(),
+    description: group.description,
+    quantity: Math.round((group.minutes / 60) * 1000) / 1000,
+    unitPrice: group.rate,
+    unit: 'hours',
+    timeEntryIds: group.ids,
+  }));
+  doc.items = [...(doc.items ?? []), ...lines] as typeof doc.items;
+
+  return entries.map((entry) => entry._id);
+}
+
+/** Puts a draft's billed time back on the unbilled list and drops those lines. */
+async function releaseProjectTime(doc: DocumentDocument): Promise<void> {
+  const items = doc.items ?? [];
+  const derived = items.filter((item) => (item.timeEntryIds ?? []).length > 0);
+  doc.items = items.filter((item) => (item.timeEntryIds ?? []).length === 0) as typeof doc.items;
+
+  const filter: Record<string, unknown> = {
+    business: doc.business,
+    billedDocumentId: doc._id,
+  };
+  const ids = derived.flatMap((item) => item.timeEntryIds ?? []);
+  if (ids.length > 0) filter['_id'] = { $in: ids };
+  await TimeEntry.updateMany(filter, { $unset: { billedDocumentId: 1 } });
+}
+
+async function markTimeBilled(doc: DocumentDocument, ids: Types.ObjectId[]): Promise<void> {
+  if (ids.length === 0) return;
+  await TimeEntry.updateMany(
+    { business: doc.business, _id: { $in: ids } },
+    { $set: { billedDocumentId: doc._id } },
+  );
 }
 
 export const documentRoutes: FastifyPluginAsync<DocumentRouteOptions> = async (app, { config }) => {
@@ -252,6 +357,9 @@ export const documentRoutes: FastifyPluginAsync<DocumentRouteOptions> = async (a
 
     assertDates(input.issueDate, input.dueDate);
 
+    const project = input.projectId ? await draftProject(context, input.projectId) : null;
+    if (project) assertProjectFits(project, input.currency, client?._id ?? input.clientId);
+
     const doc = await documents.create({
       clientUuid: input.clientUuid,
       docType: input.docType,
@@ -259,9 +367,7 @@ export const documentRoutes: FastifyPluginAsync<DocumentRouteOptions> = async (a
       number: null,
       ...(client ? { clientId: client._id } : {}),
       ...(clientSnapshot ? { clientSnapshot } : {}),
-      ...(optionalObjectId(input.projectId)
-        ? { projectId: optionalObjectId(input.projectId) }
-        : {}),
+      ...(project ? { projectId: project._id } : {}),
       items: input.items.map((item) => ({
         id: item.id ?? newLineItemId(),
         description: item.description,
@@ -269,6 +375,9 @@ export const documentRoutes: FastifyPluginAsync<DocumentRouteOptions> = async (a
         unitPrice: item.unitPrice,
         ...(item.discountBp !== undefined ? { discountBp: item.discountBp } : {}),
         ...(item.unit ? { unit: item.unit } : {}),
+        ...(item.timeEntryIds && item.timeEntryIds.length > 0
+          ? { timeEntryIds: item.timeEntryIds }
+          : {}),
       })),
       currency: input.currency,
       discount:
@@ -292,8 +401,11 @@ export const documentRoutes: FastifyPluginAsync<DocumentRouteOptions> = async (a
       createdBy: new Types.ObjectId(context.userId),
     });
 
+    const billed =
+      project && input.billProjectTime ? await addProjectTime(doc, project, context) : [];
     applyTotals(doc);
     await doc.save();
+    await markTimeBilled(doc, billed);
 
     return reply.code(201).send({ document: serializeDocument(doc, requestToday(request)) });
   });
@@ -309,6 +421,8 @@ export const documentRoutes: FastifyPluginAsync<DocumentRouteOptions> = async (a
         'items',
         'clientId',
         'clientSnapshot',
+        'projectId',
+        'billProjectTime',
         'currency',
         'discount',
         'taxRateBp',
@@ -348,6 +462,22 @@ export const documentRoutes: FastifyPluginAsync<DocumentRouteOptions> = async (a
     if (input.clientSnapshot !== undefined && !doc.clientId) {
       doc.clientSnapshot = input.clientSnapshot;
     }
+    if (input.projectId !== undefined) {
+      const next = input.projectId ? await draftProject(context, input.projectId) : null;
+      if (next) {
+        assertProjectFits(
+          next,
+          input.currency ?? doc.currency,
+          input.clientId !== undefined ? input.clientId || undefined : doc.clientId,
+        );
+      }
+      if (String(next?._id ?? '') !== String(doc.projectId ?? '')) {
+        // The old project's time and the lines that came from it go back, so the
+        // same hours are never billed twice.
+        await releaseProjectTime(doc);
+        doc.projectId = next ? next._id : undefined;
+      }
+    }
     if (input.items !== undefined) {
       doc.items = input.items.map((item) => ({
         id: item.id ?? newLineItemId(),
@@ -356,6 +486,9 @@ export const documentRoutes: FastifyPluginAsync<DocumentRouteOptions> = async (a
         unitPrice: item.unitPrice,
         ...(item.discountBp !== undefined ? { discountBp: item.discountBp } : {}),
         ...(item.unit ? { unit: item.unit } : {}),
+        ...(item.timeEntryIds && item.timeEntryIds.length > 0
+          ? { timeEntryIds: item.timeEntryIds }
+          : {}),
       })) as typeof doc.items;
     }
     if (input.currency !== undefined) doc.currency = input.currency;
@@ -375,11 +508,16 @@ export const documentRoutes: FastifyPluginAsync<DocumentRouteOptions> = async (a
     if (input.reference !== undefined) doc.reference = input.reference || undefined;
     if (input.notes !== undefined) doc.notes = input.notes || undefined;
     if (input.terms !== undefined) doc.terms = input.terms || undefined;
-    if (input.projectId !== undefined) doc.projectId = optionalObjectId(input.projectId);
+    const project =
+      input.billProjectTime && doc.projectId
+        ? await draftProject(context, String(doc.projectId))
+        : null;
+    const billed = project ? await addProjectTime(doc, project, context) : [];
 
     assertDates(doc.issueDate ?? undefined, doc.dueDate ?? undefined);
     applyTotals(doc);
     await doc.save();
+    await markTimeBilled(doc, billed);
 
     return { document: serializeDocument(doc, requestToday(request)) };
   });

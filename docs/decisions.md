@@ -427,3 +427,28 @@ A new business chooses its invoice language on the brand step, next to the templ
 invoice it sends can already be Spanish or French. The choice is saved with the same brand update
 and the live preview renders in it, so the effect is visible before the flow is finished. Settings
 keeps the same control for changing it later.
+
+## 24 November 2026 — Week 10 follow-up: the editor's project picker
+
+### The draft carries the project, and saving pulls the time
+
+Week 10 deferred the editor's project picker because billing created its own draft. Now a draft
+stores an optional `projectId`, and saving it with `billProjectTime` appends the project's unbilled
+billable time as lines grouped by rate and description — the same grouping the one-step bill uses.
+Because the entries are marked with the draft as they are added, a second save finds nothing new and
+never bills the same hours twice.
+
+### Removing or changing the project releases its time
+
+Every pulled line stores the `timeEntryIds` it was grouped from. Clearing the project (or pointing
+the draft at another one) removes those lines and puts their entries back on the unbilled list, so
+the same time cannot be sold on two invoices. The editor sends existing line links back on save for
+the same reason. Drafts billed before this change carry no line links; for them the fallback is to
+release every entry billed to that draft.
+
+### The project must fit the draft
+
+A project bills in one currency and belongs to at most one client, so saving a draft with a project
+in another currency is a validation error on `projectId`, and so is a project whose client differs
+from the chosen one. A project outside the business is a 404, like every other tenant lookup. The
+picker only offers active projects, narrowed to the chosen client when there is one.

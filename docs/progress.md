@@ -310,3 +310,17 @@ attached to this workspace — the visual and device checks for M4–M10 are sti
 template. What is verified: 93 shared tests (7 new for dictionary parity, label resolution and the
 three renderings), 89 API tests, strict TypeScript, ESLint, Prettier, and Android and web Metro
 bundles. No screen was clicked here, because no phone is attached to this workspace.
+
+## Week 10 follow-up — Project picker in the invoice editor — built
+
+- [x] A draft can point at a project (`projectId`, optional and clearable) and pull that project's
+      unbilled billable time on save (`billProjectTime`), grouped by rate and description
+- [x] Pulled lines remember their `timeEntryIds`; clearing or changing the project removes those
+      lines and releases the entries so no hours are billed twice
+- [x] Currency, client and business checks on the project, with `projectId` as the error path
+- [x] The editor shows a project row and picker (active projects, narrowed to the chosen client),
+      unbilled time for the project, and an "Add unbilled time" switch
+- [x] New API tests: pull and totals, no duplicate on re-save, release on unlink, currency mismatch,
+      another business's project
+
+**Done when:** a draft started by hand can bill a project's tracked time without leaving the editor.

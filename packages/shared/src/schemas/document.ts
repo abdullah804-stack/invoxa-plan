@@ -56,7 +56,9 @@ export const documentInputSchema = z.object({
   docType: documentTypeSchema,
   clientId: z.string().trim().max(64).optional(),
   clientSnapshot: clientSnapshotSchema.optional(),
-  projectId: z.string().trim().max(64).optional(),
+  projectId: z.string().trim().max(64).nullable().optional(),
+  /** Also pull the project's unbilled billable time onto the draft, once. */
+  billProjectTime: z.boolean().optional(),
   items: z.array(lineItemSchema).max(200),
   currency: currencySchema,
   discount: discountSchema.nullable().optional(),

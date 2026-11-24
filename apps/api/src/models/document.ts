@@ -14,6 +14,8 @@ export const lineItemSchema = new Schema(
     unitPrice: { type: Number, required: true },
     discountBp: { type: Number },
     unit: { type: String, trim: true },
+    /** The tracked time this line was grouped from, so it can be released again. */
+    timeEntryIds: { type: [String] },
   },
   { _id: false },
 );

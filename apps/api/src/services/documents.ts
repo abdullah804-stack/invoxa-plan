@@ -155,6 +155,9 @@ export function serializeDocument(doc: DocumentDocument, today: string) {
         ? { discountBp: item.discountBp }
         : {}),
       ...(item.unit ? { unit: item.unit } : {}),
+      ...(item.timeEntryIds && item.timeEntryIds.length > 0
+        ? { timeEntryIds: item.timeEntryIds }
+        : {}),
     })),
     currency: doc.currency,
     discount: serializeDiscount(doc.discount),

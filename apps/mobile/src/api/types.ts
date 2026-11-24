@@ -84,6 +84,8 @@ export interface DocumentLineItem {
   unitPrice: number;
   discountBp?: number;
   unit?: string;
+  /** Tracked time this line was grouped from, when it was pulled from a project. */
+  timeEntryIds?: string[];
 }
 
 export interface DocumentBrandSnapshot {
@@ -141,6 +143,7 @@ export interface DocumentRecord {
   shownStatus: ShownStatus;
   clientId: string | null;
   clientName: string | null;
+  projectId: string | null;
   clientSnapshot: {
     name: string;
     email: string | null;
@@ -231,6 +234,7 @@ export interface DocumentDraftItemInput {
   unitPrice: number;
   discountBp?: number;
   unit?: string;
+  timeEntryIds?: string[];
 }
 
 /** Body for creating or updating a draft; totals are always computed by the server. */
@@ -244,6 +248,10 @@ export interface DocumentDraftBody {
     taxId?: string | null;
   };
   source?: 'manual' | 'prompt' | 'voice' | 'recurring' | 'duplicate' | 'estimate' | 'time';
+  /** An optional project to point the draft at, null to unlink it. */
+  projectId?: string | null;
+  /** Also pull the project's unbilled billable time onto this draft. */
+  billProjectTime?: boolean;
   items: DocumentDraftItemInput[];
   currency: string;
   discount?: { type: 'percent'; valueBp: number } | { type: 'fixed'; valueMinor: number } | null;

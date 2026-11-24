@@ -189,6 +189,105 @@ describe('projects and tracked time', () => {
     expect(released.body.totals.unbilledMinutes).toBe(120);
   });
 
+  it('pulls a project’s unbilled time into a draft and releases it when the link is cleared', async () => {
+    const { project, clientId } = await setupProject(testApp, owner);
+    await addTime(testApp, owner, project.id, { minutes: 90 });
+    await addTime(testApp, owner, project.id, { minutes: 30 });
+    await addTime(testApp, owner, project.id, { minutes: 60, billable: false });
+
+    const created = await testApp
+      .request()
+      .post('/api/v1/invoices')
+      .set(headersFor(owner))
+      .send({
+        clientUuid: `editor-${randomSuffix()}`,
+        docType: 'invoice',
+        clientId,
+        projectId: project.id,
+        billProjectTime: true,
+        items: [{ description: 'Setup fee', quantity: 1, unitPrice: 5000 }],
+        currency: 'USD',
+      });
+
+    expect(created.status).toBe(201);
+    const draft = created.body.document;
+    expect(draft.projectId).toBe(project.id);
+    expect(draft.items).toHaveLength(2);
+    expect(draft.items[1]).toMatchObject({
+      description: 'Design revisions',
+      quantity: 2,
+      unitPrice: 9500,
+      unit: 'hours',
+    });
+    expect(draft.items[1].timeEntryIds).toHaveLength(2);
+    expect(draft.totals.total).toBe(24000);
+
+    // Saving the same draft again never bills the same time twice.
+    const again = await testApp
+      .request()
+      .put(`/api/v1/invoices/${draft.id}`)
+      .set(headersFor(owner))
+      .send({ projectId: project.id, billProjectTime: true });
+    expect(again.status).toBe(200);
+    expect(again.body.document.items).toHaveLength(2);
+
+    const billed = await testApp
+      .request()
+      .get('/api/v1/time-entries?unbilled=true')
+      .set(headersFor(owner));
+    expect(billed.body.entries).toHaveLength(0);
+
+    // Clearing the project drops its lines and puts the time back.
+    const cleared = await testApp
+      .request()
+      .put(`/api/v1/invoices/${draft.id}`)
+      .set(headersFor(owner))
+      .send({ projectId: null });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.document.projectId).toBeNull();
+    expect(cleared.body.document.items).toHaveLength(1);
+    expect(cleared.body.document.totals.total).toBe(5000);
+
+    const released = await testApp
+      .request()
+      .get('/api/v1/time-entries?unbilled=true')
+      .set(headersFor(owner));
+    expect(released.body.entries).toHaveLength(2);
+  });
+
+  it('refuses a draft project in another currency or another business', async () => {
+    const { project, clientId } = await setupProject(testApp, owner);
+    const mismatch = await testApp
+      .request()
+      .post('/api/v1/invoices')
+      .set(headersFor(owner))
+      .send({
+        clientUuid: `editor-${randomSuffix()}`,
+        docType: 'invoice',
+        clientId,
+        projectId: project.id,
+        billProjectTime: true,
+        items: [{ description: 'Setup fee', quantity: 1, unitPrice: 5000 }],
+        currency: 'EUR',
+      });
+    expect(mismatch.status).toBe(400);
+    expect(mismatch.body.error.details[0].path).toBe('projectId');
+
+    const other = await registerAccount(testApp.request, { businessName: 'Other Editor' });
+    const foreign = await testApp
+      .request()
+      .post('/api/v1/invoices')
+      .set(headersFor(other))
+      .send({
+        clientUuid: `editor-${randomSuffix()}`,
+        docType: 'invoice',
+        projectId: project.id,
+        items: [{ description: 'Setup fee', quantity: 1, unitPrice: 5000 }],
+        currency: 'USD',
+      });
+    expect(foreign.status).toBe(404);
+  });
+
   it('refuses to edit or delete time already on an invoice', async () => {
     const { project } = await setupProject(testApp, owner);
     const entry = await addTime(testApp, owner, project.id);

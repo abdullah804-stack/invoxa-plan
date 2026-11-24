@@ -1,4 +1,11 @@
-import { addDays, can, computeTotals, DOCUMENT_TITLES, type TaxMode } from '@invoxa/shared';
+import {
+  addDays,
+  can,
+  computeTotals,
+  DOCUMENT_TITLES,
+  formatMoney,
+  type TaxMode,
+} from '@invoxa/shared';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
@@ -9,6 +16,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from 'react-native';
@@ -17,6 +25,7 @@ import {
   useCreateSavedItem,
   useDocument,
   useProfile,
+  useProject,
   useSavedItems,
   useUpdateDocument,
 } from '../../src/api/hooks';
@@ -24,6 +33,7 @@ import { useSession } from '../../src/auth/SessionProvider';
 import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
 import { ClientPicker } from '../../src/components/ClientPicker';
+import { ProjectPicker } from '../../src/components/ProjectPicker';
 import { Screen } from '../../src/components/Screen';
 import { Segmented } from '../../src/components/Segmented';
 import { Sheet } from '../../src/components/Sheet';
@@ -31,6 +41,7 @@ import { Skeleton } from '../../src/components/Skeleton';
 import { TextField } from '../../src/components/TextField';
 import { TotalsBlock } from '../../src/components/TotalsBlock';
 import { errorMessage } from '../../src/lib/errors';
+import { formatMinutes } from '../../src/lib/time';
 import {
   amountToInput,
   parseAmountToMinor,
@@ -50,6 +61,8 @@ interface ItemDraft {
   quantity: string;
   unitPrice: string;
   discount: string;
+  /** Kept when the line came from tracked time, so saving keeps the link. */
+  timeEntryIds?: string[];
 }
 
 const DOC_TYPE_OPTIONS: { value: DocType; label: string }[] = [
@@ -144,8 +157,14 @@ export default function DocumentEditorScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [savedOpen, setSavedOpen] = useState(false);
+  const [projectOpen, setProjectOpen] = useState(false);
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [addTime, setAddTime] = useState(true);
+
+  const projectDetail = useProject(projectId ?? undefined);
 
   const canSaveItems = activeRole ? can(activeRole, 'savedItems:write') : false;
+  const canSeeProjects = activeRole ? can(activeRole, 'projects:read') : false;
   const busy = createDocument.isPending || updateDocument.isPending;
 
   // Defaults for a new document come from the business profile.
@@ -170,6 +189,7 @@ export default function DocumentEditorScreen() {
     setCurrency(docCurrency);
     setClientId(document.clientId);
     setClientName(document.clientName ?? '');
+    setProjectId(document.projectId);
     setItems(
       document.items.map((item) => ({
         key: item.id,
@@ -177,6 +197,7 @@ export default function DocumentEditorScreen() {
         quantity: String(item.quantity),
         unitPrice: amountToInput(item.unitPrice, docCurrency),
         discount: item.discountBp ? String(item.discountBp / 100) : '',
+        ...(item.timeEntryIds?.length ? { timeEntryIds: item.timeEntryIds } : {}),
       })),
     );
     if (document.discount) {
@@ -302,6 +323,7 @@ export default function DocumentEditorScreen() {
           quantity,
           unitPrice,
           ...(discountBp > 0 ? { discountBp } : {}),
+          ...(item.timeEntryIds?.length ? { timeEntryIds: item.timeEntryIds } : {}),
         });
       }
     });
@@ -339,6 +361,8 @@ export default function DocumentEditorScreen() {
       taxRateBp: taxRateBp ?? 0,
       taxMode,
       ...(clientId ? { clientId } : {}),
+      projectId: projectId ?? null,
+      ...(projectId && addTime ? { billProjectTime: true } : {}),
       ...(issueDate.trim() ? { issueDate: issueDate.trim() } : {}),
       ...(docType === 'estimate'
         ? validUntil.trim()
@@ -468,6 +492,83 @@ export default function DocumentEditorScreen() {
                   <Text style={[styles.error, { color: colors.danger }]}>{errors['clientId']}</Text>
                 ) : null}
               </View>
+
+              {canSeeProjects ? (
+                <View style={styles.section}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Project</Text>
+                    {projectId ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Remove the project from this draft"
+                        onPress={() => setProjectId(null)}
+                        hitSlop={8}
+                      >
+                        <Text style={[styles.link, { color: colors.accent }]}>Remove</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Choose a project"
+                    onPress={() => setProjectOpen(true)}
+                    style={[
+                      styles.clientRow,
+                      {
+                        backgroundColor: colors.surface,
+                        borderColor: errors['projectId'] ? colors.danger : colors.border,
+                      },
+                    ]}
+                  >
+                    <View style={styles.clientText}>
+                      <Text style={[styles.clientName, { color: colors.text }]} numberOfLines={1}>
+                        {projectDetail.data?.project.name ?? 'No project'}
+                      </Text>
+                      <Text style={[styles.clientHint, { color: colors.textMuted }]}>
+                        {projectId ? 'Tap to change' : 'Link tracked time to this draft'}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                  </Pressable>
+                  {errors['projectId'] ? (
+                    <Text style={[styles.error, { color: colors.danger }]}>
+                      {errors['projectId']}
+                    </Text>
+                  ) : null}
+                  {projectId ? (
+                    <View
+                      style={[
+                        styles.timeRow,
+                        { backgroundColor: colors.surface, borderColor: colors.border },
+                      ]}
+                    >
+                      <View style={styles.clientText}>
+                        <Text style={[styles.clientName, { color: colors.text }]}>
+                          Add unbilled time
+                        </Text>
+                        <Text style={[styles.clientHint, { color: colors.textMuted }]}>
+                          {projectDetail.isLoading
+                            ? 'Checking tracked time…'
+                            : (projectDetail.data?.time.unbilledMinutes ?? 0) > 0
+                              ? `${formatMinutes(projectDetail.data?.time.unbilledMinutes ?? 0)} unbilled · ${formatMoney(projectDetail.data?.time.unbilledValueMinor ?? 0, currency)}`
+                              : 'No unbilled time on this project'}
+                        </Text>
+                      </View>
+                      <Switch
+                        value={addTime}
+                        onValueChange={setAddTime}
+                        disabled={(projectDetail.data?.time.unbilledMinutes ?? 0) === 0}
+                        accessibilityLabel="Add unbilled time"
+                        trackColor={{ true: colors.accentSoft, false: colors.surfaceMuted }}
+                        thumbColor={addTime ? colors.accent : colors.surface}
+                      />
+                    </View>
+                  ) : null}
+                  <Text style={[styles.hint, { color: colors.textMuted }]}>
+                    Unbilled hours are added as lines when you save.
+                  </Text>
+                </View>
+              ) : null}
 
               <View style={styles.dateRow}>
                 <TextField
@@ -687,10 +788,28 @@ export default function DocumentEditorScreen() {
           setClientId(client.id);
           setClientName(client.name);
           setPickerOpen(false);
+          // A project belongs to one client; keep the draft consistent with it.
+          const projectClient = projectDetail.data?.project.clientId ?? null;
+          if (projectClient && projectClient !== client.id) setProjectId(null);
         }}
         onCreate={() => {
           setPickerOpen(false);
           router.push('/client/new');
+        }}
+      />
+
+      <ProjectPicker
+        visible={projectOpen}
+        selectedId={projectId}
+        clientId={clientId}
+        onClose={() => setProjectOpen(false)}
+        onSelect={(project) => {
+          setProjectId(project.id);
+          setProjectOpen(false);
+          if (!clientId && project.clientId) {
+            setClientId(project.clientId);
+            setClientName(project.clientName ?? '');
+          }
         }}
       />
 
@@ -873,5 +992,17 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
+  },
+  hint: {
+    ...typeScale.small,
+  },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
 });
