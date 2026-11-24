@@ -197,3 +197,38 @@ verified: 72 shared tests (6 new for prompt redaction and the AI schemas), 69 AP
 for units, redaction in the outgoing prompt, permissions, quota, refunds and validation), strict
 TypeScript, ESLint, Prettier, and Android and web Metro bundles. No prompt was sent to Google
 from this workspace, because `GEMINI_API_KEY` is not set.
+
+## M8 — Reminders and recurring invoices (week 8) — built
+
+- [x] `GET /reminders`: sent invoices that are overdue or due inside the business warning window,
+      with the stored reminder settings, per-currency balances and days until due
+- [x] Home shows a "Needs a nudge" card with those counts and opens the invoice list; every
+      loading, empty and error path is the same component set as the rest of the app
+- [x] Settings lets an owner switch reminders on or off, pick the hour (0–23) and the warning
+      window (0–7 days); the values live on the business profile
+- [x] Local due-date notifications (`expo-notifications`, no push service and no email): the phone
+      schedules one at `due date − warning days`, reconciles them on every Home refresh and asks
+      for permission only when reminders are saved
+- [x] Recurring invoices: `GET`/`POST /recurring`, `GET`/`PUT`/`DELETE /recurring/:id` and the
+      idempotent `POST /recurring/run`
+- [x] A schedule is made from an existing invoice, copying its client, lines, discount, tax,
+      notes and currency, so there is no second invoice builder to keep in sync
+- [x] Each occurrence creates an ordinary **draft** with that occurrence's date and the schedule's
+      payment terms; nothing is issued or numbered automatically
+- [x] A unique `(schedule, occurrence)` row makes a repeated cron run, a retried call and two
+      workers create one draft only; a failed draft removes its row and is retried next time
+- [x] Monthly schedules keep the start day across short months (31 Jan → 28 Feb → 31 Mar) and
+      yearly ones keep 29 February, both covered by shared tests
+- [x] `POST /recurring/run` accepts the `x-job-secret` for the daily job (all businesses) or a
+      normal token (the caller's business), and the app calls it on open
+- [x] Pausing stops new drafts; resuming does not backfill missed months. Stopping keeps the
+      drafts already made
+- [x] "Repeat this invoice" on an invoice, and a Recurring list with pause, resume, open the
+      original, stop, and a manual "check for due drafts"
+
+**Done when:** a client gets a regular invoice without you rebuilding it, and you are reminded
+before one is due — the API is verified end to end; notifications and the screens are not, because
+no phone is attached to this workspace. What is verified: 77 shared tests (5 new for monthly,
+weekly and yearly date maths), 78 API tests (9 new for schedules, idempotent runs, the job secret,
+permissions, business isolation and the reminder split), strict TypeScript, ESLint, Prettier, and
+Android and web Metro bundles. No notification was delivered and no screen was clicked here.

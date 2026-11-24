@@ -17,5 +17,6 @@ export * from './format.js';
 export * from './labels.js';
 export * from './renderer.js';
 export * from './ai.js';
+export * from './recurring.js';
 export * from './permissions.js';
 export * from './schemas/index.js';

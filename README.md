@@ -28,7 +28,7 @@ npm run dev:api      # Fastify API on PORT (default 4000)
 npm run dev:mobile   # Expo app (Expo Go or a dev build)
 ```
 
-### API (M2–M7)
+### API (M2–M8)
 
 Base path `/api/v1`. All routes except `register`, `login` and `health` need
 `Authorization: Bearer <jwt>`; business routes read `X-Business-Id` (first business if absent)
@@ -43,13 +43,17 @@ and `X-Timezone`.
 | Documents | `GET`/`POST /invoices`, `GET`/`PUT`/`DELETE /invoices/:id`, plus `/issue`, `/payments`, `/status`, `/duplicate`, `/convert`, `/apply-credit` |
 | Reports   | `GET /reports/summary`                                                                                                                       |
 | AI        | `POST /ai/draft` (a sentence in, a validated draft suggestion out; no document is written)                                                   |
+| Reminders | `GET /reminders` (overdue and due-soon sent invoices inside the business warning window)                                                     |
+| Recurring | `GET`/`POST /recurring`, `GET`/`PUT`/`DELETE /recurring/:id`, `POST /recurring/run` (idempotent; job secret or a signed-in user)             |
 | Extras    | `GET`/`POST /saved-items`, `DELETE /saved-items/:id`                                                                                         |
 
 Errors always use `{ "error": { "code", "message", "details": [] } }`. A record in another
 business returns 404, never 403. Copy `apps/api/.env.example` to `apps/api/.env`; the server
-refuses to start without a `JWT_SECRET` of 32+ characters.
+refuses to start without a `JWT_SECRET` of 32+ characters. `POST /recurring/run` takes an
+`x-job-secret` header when called by a scheduler (set `JOB_SECRET`), and otherwise runs only the
+caller's business with a normal token.
 
-### Mobile (M4–M7)
+### Mobile (M4–M8)
 
 Expo Router app with an auth gate, SecureStore session, light and dark theme tokens, a three-step
 brand setup, a document editor with live shared totals, document detail actions and the client
@@ -81,6 +85,12 @@ npm run dev:mobile                             # then scan the QR code or press 
 - "Describe it" turns one sentence into an editable draft: after the one-time Gemini notice it
   creates an ordinary draft (reusing a client with the same name) and opens the editor. AI
   drafting needs `GEMINI_API_KEY` on the API; without it the screen says so plainly.
+- The Home screen warns about overdue and due-soon invoices and schedules local notifications on
+  the phone at the reminder hour. Settings holds the reminder switch, hour and warning window;
+  nothing is emailed, so reminders need no mail service.
+- An invoice can be repeated weekly, monthly or yearly from its screen. Each occurrence is a draft
+  made on app open or by the daily job, and the schedule can be paused, resumed or stopped under
+  Settings → Recurring invoices.
 
 ## Rules this codebase follows
 

@@ -285,3 +285,47 @@ On-device speech recognition needs a development build and cannot run in Expo Go
 attached to this workspace. Shipping a screen that cannot be tested would be worse than leaving
 it out, so week 7 ships typing, with the notice and quota machinery voice will reuse. Voice stays
 on the list for the first milestone with a device.
+
+## 24 November 2026 — Week 8
+
+### Reminders are local notifications, not email
+
+A reminder email needs a mail provider, a sending domain and a paid tier once volume grows, and
+the free stack has none. The phone already holds the due dates, so reminders are local
+notifications scheduled at `due date − warning days`, plus a Home card for anything overdue. The
+business profile keeps `enabled`, `hour` and `daysBefore`; the app reconciles the phone's schedule
+on every Home refresh, so a changed setting takes effect without a background service. The
+notification permission is requested only when reminders are switched on, never at launch.
+
+### A schedule repeats an invoice; there is no second builder
+
+Creating schedules from an existing invoice means one editor, one client picker and one set of
+lines. The schedule stores the fields it repeats as a copy, so editing the original later does not
+change what already runs and deleting it does not break the schedule.
+
+### Occurrences are drafts and idempotent
+
+Every occurrence becomes an ordinary draft with that occurrence's date as its issue date and the
+schedule's payment terms; numbering, issuing and sending stay manual. `recurringRuns` has a unique
+`(schedule, scheduledFor)` index, so a cron run that fires twice, a retried request or two workers
+cannot create the same draft twice. The schedule advances only after a successful draft, a failed
+one removes its run row and records the message, and a long outage creates at most 12 occurrences
+per schedule so nobody is flooded.
+
+### Month-end dates keep their anchor
+
+`nextRunDate` computes from the schedule's start day instead of the last clamped result: 31 January
+goes to 28 February and back to 31 March, and 29 February yearly goes to 28 February in later
+years. This is unit-tested rather than left to `Date.setMonth`.
+
+### Reminders and schedules are business-scoped like everything else
+
+`GET /reminders` needs `documents:read`, schedule writes need `drafts:create`, and every query goes
+through the scoped helper, so a viewer can see what is due but cannot schedule or stop anything.
+The job secret is the only unauthenticated path, and it only runs schedules; it cannot read data.
+
+### New mobile dependency
+
+`expo-notifications` at the SDK 58 version, installed with `expo install`. It is an official Expo
+module, needs no paid service and is used for local notifications only. `npm audit` still reports
+only the three moderate Expo tooling advisories noted in week 4.

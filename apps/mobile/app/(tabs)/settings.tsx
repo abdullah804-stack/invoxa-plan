@@ -2,14 +2,18 @@ import { can } from '@invoxa/shared';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { API_URL } from '../../src/api/client';
-import { useProfile } from '../../src/api/hooks';
+import { useProfile, useUpdateProfile } from '../../src/api/hooks';
 import { useSession } from '../../src/auth/SessionProvider';
 import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
 import { Screen } from '../../src/components/Screen';
 import { Segmented } from '../../src/components/Segmented';
+import { TextField } from '../../src/components/TextField';
+import { errorMessage } from '../../src/lib/errors';
+import { ensureNotificationPermission } from '../../src/lib/reminders';
 import { spacing, typeScale, type ThemeMode } from '../../src/theme/tokens';
 import { useTheme } from '../../src/theme/ThemeProvider';
 
@@ -25,9 +29,57 @@ export default function SettingsScreen() {
   const profile = useProfile();
   const router = useRouter();
 
+  const updateProfile = useUpdateProfile();
   const business = profile.data?.business;
   const canEditBrand = activeRole ? can(activeRole, 'brand:update') : false;
+  const canManageReminders = activeRole ? can(activeRole, 'business:update') : false;
+  const canRepeat = activeRole ? can(activeRole, 'drafts:create') : false;
   const version = Constants.expoConfig?.version ?? '0.1.0';
+
+  const [remindersEnabled, setRemindersEnabled] = useState(true);
+  const [reminderHour, setReminderHour] = useState('9');
+  const [reminderDays, setReminderDays] = useState('2');
+  const [reminderNotice, setReminderNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    const reminders = business?.reminders;
+    if (!reminders) return;
+    setRemindersEnabled(reminders.enabled);
+    setReminderHour(String(reminders.hour));
+    setReminderDays(String(reminders.daysBefore));
+  }, [business?.id, business?.reminders]);
+
+  const saveReminders = async () => {
+    setReminderNotice(null);
+    const hour = Number(reminderHour.trim());
+    const days = Number(reminderDays.trim());
+    if (!Number.isInteger(hour) || hour < 0 || hour > 23) {
+      setReminderNotice('Choose an hour from 0 to 23');
+      return;
+    }
+    if (!Number.isInteger(days) || days < 0 || days > 7) {
+      setReminderNotice('Choose 0 to 7 days before the due date');
+      return;
+    }
+
+    try {
+      await updateProfile.mutateAsync({
+        reminders: { enabled: remindersEnabled, hour, daysBefore: days },
+      });
+      if (!remindersEnabled) {
+        setReminderNotice('Saved. Due-date reminders are off.');
+        return;
+      }
+      const allowed = await ensureNotificationPermission();
+      setReminderNotice(
+        allowed
+          ? 'Saved. Reminders are scheduled on this phone.'
+          : 'Saved in the app. Notifications are blocked in your phone settings.',
+      );
+    } catch (error) {
+      setReminderNotice(errorMessage(error));
+    }
+  };
 
   return (
     <Screen edges={['top', 'left', 'right']}>
@@ -82,6 +134,88 @@ export default function SettingsScreen() {
             ) : null}
           </Card>
         </View>
+
+        {canManageReminders ? (
+          <View style={styles.section}>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Reminders</Text>
+            <Card style={styles.card}>
+              <View style={styles.row}>
+                <View style={styles.rowText}>
+                  <Text style={[styles.rowTitle, { color: colors.text }]}>
+                    Due-date notifications
+                  </Text>
+                  <Text style={[styles.rowSubtitle, { color: colors.textMuted }]}>
+                    A local notification before an invoice is due.
+                  </Text>
+                </View>
+                <Switch
+                  value={remindersEnabled}
+                  onValueChange={setRemindersEnabled}
+                  accessibilityLabel="Due-date notifications"
+                  trackColor={{ true: colors.accentSoft, false: colors.surfaceMuted }}
+                  thumbColor={remindersEnabled ? colors.accent : colors.surface}
+                />
+              </View>
+              <View style={styles.reminderFields}>
+                <View style={styles.reminderField}>
+                  <TextField
+                    label="Hour (0-23)"
+                    value={reminderHour}
+                    onChangeText={setReminderHour}
+                    keyboardType="number-pad"
+                    maxLength={2}
+                  />
+                </View>
+                <View style={styles.reminderField}>
+                  <TextField
+                    label="Days before"
+                    value={reminderDays}
+                    onChangeText={setReminderDays}
+                    keyboardType="number-pad"
+                    maxLength={1}
+                  />
+                </View>
+              </View>
+              {reminderNotice ? (
+                <Text style={[styles.hint, { color: colors.textMuted }]}>{reminderNotice}</Text>
+              ) : null}
+              <Button
+                title="Save reminders"
+                variant="secondary"
+                onPress={() => void saveReminders()}
+                loading={updateProfile.isPending}
+              />
+              <Text style={[styles.hint, { color: colors.textMuted }]}>
+                Reminders are local to this phone. Nothing is emailed.
+              </Text>
+            </Card>
+          </View>
+        ) : null}
+
+        {canRepeat ? (
+          <View style={styles.section}>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Automation</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Recurring invoices"
+              onPress={() => router.push('/recurring')}
+            >
+              <Card style={styles.card}>
+                <View style={styles.row}>
+                  <View style={styles.rowText}>
+                    <Text style={[styles.rowTitle, { color: colors.text }]}>
+                      Recurring invoices
+                    </Text>
+                    <Text style={[styles.rowSubtitle, { color: colors.textMuted }]}>
+                      Repeat an invoice and manage its schedule.
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.accent} />
+                </View>
+              </Card>
+            </Pressable>
+          </View>
+        ) : null}
 
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Appearance</Text>
@@ -193,6 +327,14 @@ const styles = StyleSheet.create({
   },
   hint: {
     ...typeScale.small,
+  },
+  reminderFields: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.sm,
+  },
+  reminderField: {
+    flex: 1,
   },
   badge: {
     ...typeScale.tiny,

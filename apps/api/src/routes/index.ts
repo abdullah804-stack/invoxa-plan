@@ -7,6 +7,8 @@ import { clientRoutes } from './clients.js';
 import { documentRoutes } from './documents.js';
 import { healthRoutes } from './health.js';
 import { profileRoutes } from './profile.js';
+import { recurringRoutes } from './recurring.js';
+import { reminderRoutes } from './reminders.js';
 import { reportRoutes } from './reports.js';
 import { savedItemRoutes } from './savedItems.js';
 
@@ -21,6 +23,8 @@ export async function registerRoutes(app: FastifyInstance, config: ApiConfig): P
       await api.register(savedItemRoutes, { config });
       await api.register(reportRoutes, { config });
       await api.register(aiRoutes, { config });
+      await api.register(recurringRoutes, { config });
+      await api.register(reminderRoutes, { config });
     },
     { prefix: API_BASE_PATH },
   );

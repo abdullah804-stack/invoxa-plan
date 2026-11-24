@@ -14,6 +14,8 @@ import type {
   DocumentRecord,
   PaymentInput,
   Profile,
+  RecurringSchedule,
+  ReminderList,
   SavedItem,
   Summary,
   User,
@@ -45,6 +47,7 @@ export interface ProfileUpdate {
     fontPair?: 'manrope-inter' | 'lora-inter' | 'space-grotesk-inter';
     headerLayout?: 'logo-left' | 'logo-right' | 'centered';
   };
+  reminders?: { enabled?: boolean; hour?: number; daysBefore?: number };
 }
 
 export function registerAccount(input: {
@@ -219,6 +222,56 @@ export function duplicateDocument(id: string): Promise<{ document: DocumentRecor
 
 export function fetchSummary(): Promise<Summary> {
   return apiRequest<Summary>('/reports/summary');
+}
+
+export function fetchReminders(): Promise<ReminderList> {
+  return apiRequest<ReminderList>('/reminders');
+}
+
+export function listRecurring(): Promise<{ schedules: RecurringSchedule[] }> {
+  return apiRequest<{ schedules: RecurringSchedule[] }>('/recurring');
+}
+
+export function createRecurring(input: {
+  documentId: string;
+  interval: 'weekly' | 'monthly' | 'yearly';
+  intervalCount?: number;
+  startDate?: string;
+  dueDays?: number;
+  endDate?: string;
+}): Promise<{ schedule: RecurringSchedule }> {
+  return apiRequest<{ schedule: RecurringSchedule }>('/recurring', { method: 'POST', body: input });
+}
+
+export function updateRecurring(
+  id: string,
+  input: {
+    interval?: 'weekly' | 'monthly' | 'yearly';
+    intervalCount?: number;
+    dueDays?: number;
+    endDate?: string | null;
+    active?: boolean;
+  },
+): Promise<{ schedule: RecurringSchedule }> {
+  return apiRequest<{ schedule: RecurringSchedule }>(`/recurring/${id}`, {
+    method: 'PUT',
+    body: input,
+  });
+}
+
+export function deleteRecurring(id: string): Promise<void> {
+  return apiRequest<void>(`/recurring/${id}`, { method: 'DELETE' });
+}
+
+export function runRecurring(): Promise<{
+  created: number;
+  schedules: number;
+  documents: string[];
+}> {
+  return apiRequest<{ created: number; schedules: number; documents: string[] }>('/recurring/run', {
+    method: 'POST',
+    body: {},
+  });
 }
 
 export type { Business, DocumentRecord };

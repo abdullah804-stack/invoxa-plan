@@ -498,6 +498,14 @@ export default function DocumentDetailScreen() {
                 />
               ) : null}
 
+              {document.docType === 'invoice' && canEdit ? (
+                <Button
+                  title="Repeat this invoice"
+                  variant="secondary"
+                  onPress={() => router.push(`/recurring/new?documentId=${document.id}`)}
+                />
+              ) : null}
+
               {status === 'draft' ? (
                 <Button
                   title="Delete draft"

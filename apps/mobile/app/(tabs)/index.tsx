@@ -1,15 +1,17 @@
-import { formatMoney } from '@invoxa/shared';
+import { can, formatMoney } from '@invoxa/shared';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Card } from '../../src/components/Card';
 import { DocumentRow } from '../../src/components/DocumentRow';
 import { Screen } from '../../src/components/Screen';
 import { Skeleton, SkeletonRows } from '../../src/components/Skeleton';
 import { EmptyState, ErrorState } from '../../src/components/States';
-import { useSummary } from '../../src/api/hooks';
+import { useReminders, useRunRecurring, useSummary } from '../../src/api/hooks';
 import { useSession } from '../../src/auth/SessionProvider';
 import { errorMessage } from '../../src/lib/errors';
+import { syncDueReminders } from '../../src/lib/reminders';
 import { radius, spacing, typeScale } from '../../src/theme/tokens';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import type { CurrencySummary } from '../../src/api/types';
@@ -59,8 +61,22 @@ function CurrencyCard({ summary }: { summary: CurrencySummary }) {
 export default function DashboardScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const { user, businesses, activeBusinessId } = useSession();
+  const { user, businesses, activeBusinessId, activeRole } = useSession();
   const summary = useSummary();
+  const reminders = useReminders();
+  const runRecurring = useRunRecurring();
+  const ranRecurring = useRef(false);
+
+  useEffect(() => {
+    void syncDueReminders(reminders.data);
+  }, [reminders.data]);
+
+  useEffect(() => {
+    if (ranRecurring.current || !activeRole || !can(activeRole, 'drafts:create')) return;
+    ranRecurring.current = true;
+    // Idempotent: called on app open, as docs/limits.md requires.
+    runRecurring.mutate(undefined, { onError: () => undefined });
+  }, [activeRole]);
 
   const businessName =
     businesses.find((business) => business.id === activeBusinessId)?.name ?? 'Your business';
@@ -99,6 +115,25 @@ export default function DashboardScreen() {
             </Text>
           </View>
         </View>
+
+        {reminders.data && reminders.data.counts.overdue + reminders.data.counts.dueSoon > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open invoices that need a reminder"
+            onPress={() => router.push('/invoices')}
+          >
+            <Card style={styles.reminderCard}>
+              <View style={styles.reminderTop}>
+                <Ionicons name="notifications-outline" size={18} color={colors.accent} />
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Needs a nudge</Text>
+              </View>
+              <Text style={[styles.reminderText, { color: colors.textMuted }]}>
+                {reminders.data.counts.overdue} overdue · {reminders.data.counts.dueSoon} due soon
+                {reminders.data.settings.enabled ? ' · reminders on this phone' : ''}
+              </Text>
+            </Card>
+          </Pressable>
+        ) : null}
 
         {summary.isLoading ? (
           <View style={styles.loading}>
@@ -270,6 +305,19 @@ const styles = StyleSheet.create({
     ...typeScale.bodyStrong,
   },
   note: {
+    ...typeScale.small,
+  },
+  reminderCard: {
+    gap: spacing.xs,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  reminderTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  reminderText: {
     ...typeScale.small,
   },
   section: {

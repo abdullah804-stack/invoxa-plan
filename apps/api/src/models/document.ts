@@ -6,7 +6,7 @@ import { Schema, model, type InferSchemaType } from 'mongoose';
  * only on issue, so drafts carry number: null.
  */
 
-const lineItemSchema = new Schema(
+export const lineItemSchema = new Schema(
   {
     id: { type: String, required: true },
     description: { type: String, required: true, trim: true },
@@ -18,7 +18,7 @@ const lineItemSchema = new Schema(
   { _id: false },
 );
 
-const invoiceDiscountSchema = new Schema(
+export const invoiceDiscountSchema = new Schema(
   {
     type: { type: String, enum: ['percent', 'fixed'], required: true },
     valueBp: { type: Number },
@@ -27,7 +27,7 @@ const invoiceDiscountSchema = new Schema(
   { _id: false },
 );
 
-const clientSnapshotSchema = new Schema(
+export const clientSnapshotSchema = new Schema(
   {
     name: { type: String, required: true },
     email: { type: String },

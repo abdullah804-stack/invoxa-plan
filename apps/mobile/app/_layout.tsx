@@ -75,6 +75,8 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="document/new" />
         <Stack.Screen name="document/ai" />
+        <Stack.Screen name="recurring/index" />
+        <Stack.Screen name="recurring/new" />
         <Stack.Screen name="document/preview" />
         <Stack.Screen name="document/[id]" />
         <Stack.Screen name="client/[id]" />

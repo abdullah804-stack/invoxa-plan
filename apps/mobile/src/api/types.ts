@@ -294,3 +294,51 @@ export interface Summary {
   dueSoon: DocumentRecord[];
   recent: DocumentRecord[];
 }
+
+export interface ReminderItem {
+  id: string;
+  number: string | null;
+  clientName: string | null;
+  dueDate: string;
+  currency: string;
+  balance: number;
+  total: number;
+  daysUntilDue: number;
+}
+
+export interface ReminderSettings {
+  enabled: boolean;
+  hour: number;
+  daysBefore: number;
+}
+
+export interface ReminderList {
+  settings: ReminderSettings;
+  today: string;
+  counts: { overdue: number; dueSoon: number };
+  overdue: ReminderItem[];
+  dueSoon: ReminderItem[];
+}
+
+export interface RecurringSchedule {
+  id: string;
+  documentId: string;
+  clientId: string | null;
+  clientName: string | null;
+  currency: string;
+  items: DocumentLineItem[];
+  discount: { type: 'percent'; valueBp: number } | { type: 'fixed'; valueMinor: number } | null;
+  taxRateBp: number;
+  taxMode: 'added' | 'included';
+  interval: 'weekly' | 'monthly' | 'yearly';
+  intervalCount: number;
+  startDate: string;
+  endDate: string | null;
+  nextRunAt: string;
+  dueDays: number;
+  active: boolean;
+  lastRunAt: string | null;
+  lastDocumentId: string | null;
+  lastError: string | null;
+  createdAt: string;
+}

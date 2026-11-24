@@ -6,8 +6,11 @@ import {
   createSavedItem,
   deleteClient,
   deleteDocument,
+  createRecurring,
+  deleteRecurring,
   draftWithAi,
   duplicateDocument,
+  fetchReminders,
   fetchBrandAsset,
   fetchClient,
   fetchDocument,
@@ -16,13 +19,16 @@ import {
   issueDocument,
   listClients,
   listDocuments,
+  listRecurring,
   listSavedItems,
   recordPayment,
   removeLogo,
+  runRecurring,
   setDocumentStatus,
   updateClient,
   updateDocument,
   updateProfile,
+  updateRecurring,
   uploadLogo,
   type ClientInput,
   type ProfileUpdate,
@@ -34,6 +40,7 @@ import type {
   DocumentRecord,
   PaymentInput,
   Profile,
+  RecurringSchedule,
 } from './types';
 
 /**
@@ -51,6 +58,8 @@ export const queryKeys = {
   client: (businessId: string | null, id: string) => ['client', businessId, id] as const,
   savedItems: (businessId: string | null) => ['saved-items', businessId] as const,
   brandAsset: (businessId: string | null, id: string) => ['brand-asset', businessId, id] as const,
+  reminders: (businessId: string | null) => ['reminders', businessId] as const,
+  recurring: (businessId: string | null) => ['recurring', businessId] as const,
 };
 
 export function useProfile() {
@@ -60,6 +69,93 @@ export function useProfile() {
     queryFn: fetchProfile,
     enabled: status === 'signedIn' && Boolean(activeBusinessId),
     staleTime: 30_000,
+  });
+}
+
+export function useReminders() {
+  const { status, activeBusinessId } = useSession();
+  return useQuery({
+    queryKey: queryKeys.reminders(activeBusinessId),
+    queryFn: fetchReminders,
+    enabled: status === 'signedIn' && Boolean(activeBusinessId),
+    staleTime: 60_000,
+  });
+}
+
+export function useRecurringSchedules() {
+  const { status, activeBusinessId } = useSession();
+  return useQuery({
+    queryKey: queryKeys.recurring(activeBusinessId),
+    queryFn: listRecurring,
+    enabled: status === 'signedIn' && Boolean(activeBusinessId),
+  });
+}
+
+function useRecurringInvalidation() {
+  const queryClient = useQueryClient();
+  const { activeBusinessId } = useSession();
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.recurring(activeBusinessId) });
+    void queryClient.invalidateQueries({ queryKey: ['documents', activeBusinessId] });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.summary(activeBusinessId) });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.reminders(activeBusinessId) });
+  };
+}
+
+export function useCreateRecurring() {
+  const invalidate = useRecurringInvalidation();
+  return useMutation({
+    mutationFn: (input: {
+      documentId: string;
+      interval: 'weekly' | 'monthly' | 'yearly';
+      intervalCount?: number;
+      startDate?: string;
+      dueDays?: number;
+      endDate?: string;
+    }) => createRecurring(input),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateRecurring() {
+  const invalidate = useRecurringInvalidation();
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...input
+    }: {
+      id: string;
+      interval?: 'weekly' | 'monthly' | 'yearly';
+      intervalCount?: number;
+      dueDays?: number;
+      endDate?: string | null;
+      active?: boolean;
+    }) => updateRecurring(id, input),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteRecurring() {
+  const invalidate = useRecurringInvalidation();
+  const queryClient = useQueryClient();
+  const { activeBusinessId } = useSession();
+  return useMutation({
+    mutationFn: (id: string) => deleteRecurring(id),
+    onSuccess: (_data, id) => {
+      queryClient.setQueryData<{ schedules: RecurringSchedule[] } | undefined>(
+        queryKeys.recurring(activeBusinessId),
+        (current) => current && { schedules: current.schedules.filter((s) => s.id !== id) },
+      );
+      invalidate();
+    },
+  });
+}
+
+export function useRunRecurring() {
+  const invalidate = useRecurringInvalidation();
+  return useMutation({
+    mutationFn: runRecurring,
+    onSuccess: invalidate,
   });
 }
 
