@@ -235,3 +235,27 @@ no phone is attached to this workspace. What is verified: 77 shared tests (5 new
 weekly and yearly date maths), 78 API tests (9 new for schedules, idempotent runs, the job secret,
 permissions, business isolation and the reminder split), strict TypeScript, ESLint, Prettier, and
 Android and web Metro bundles. No notification was delivered and no screen was clicked here.
+
+## M9 — Expenses (week 9) — built
+
+- [x] Expense model and `GET`/`POST /expenses`, `GET`/`PUT`/`DELETE /expenses/:id`, all businesses
+      scoped and paged by a limit of up to 200 newest first
+- [x] Amounts are integer minor units, must be more than zero, and keep the currency they were
+      spent in; totals are never added across currencies
+- [x] Date, category, description, optional vendor, notes and the tax part of the amount; the
+      category list is the shared enum (software, travel, meals, supplies, equipment, fees, other)
+- [x] `GET /expenses` filters by category and a date range and returns the filtered totals plus
+      this month's totals per currency, computed on the server
+- [x] `expenses:read` for every role, `expenses:write` for owners and staff; a viewer gets 403 on
+      writes and 200 on reads, and another business's expense is 404
+- [x] Expenses are separate from invoices, so a receipt can never change what a client owes
+- [x] Mobile Expenses tab: this month's total per currency, category chips, newest-first list with
+      description, vendor, category and date, plus loading, empty and error states
+- [x] Add and edit screen with inline validation, currency taken from the business profile, and a
+      confirmed delete that updates every total
+
+**Done when:** you record what the business spends and see this month's costs without touching an
+invoice. What is verified: 81 shared tests (4 new for expense validation), 83 API tests (5 new for
+create/filter/totals, update/delete, permissions, tenant isolation and validation), strict
+TypeScript, ESLint, Prettier, and Android and web Metro bundles. No screen was clicked here, because
+no phone is attached to this workspace.

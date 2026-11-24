@@ -339,3 +339,31 @@ header from repository secrets (never a file in the repo). GitHub can delay or d
 is why the app still calls the same endpoint on open and why a repeated run cannot duplicate a
 draft. With no deployment yet, a missing `API_URL` or `JOB_SECRET` skips the run with a warning
 rather than failing every morning.
+
+## 24 November 2026 — Week 9
+
+### Expenses are their own records, not invoice lines
+
+A receipt must never change what a client owes, so expenses live in their own collection with
+their own permissions. A later milestone can bill one by copying it into a line; until then the two
+ledgers cannot interfere. The amount is the gross money that left the account, the optional tax part
+is kept only for reclaiming, and everything is integer minor units like every other amount.
+
+### Totals are per currency, computed on the server
+
+`GET /expenses` returns the totals for the current filter and for the current month, each grouped
+by currency and never summed together — the same rule the dashboard uses. Doing it on the server
+means the list and the header cannot disagree, and the app does not have to fetch every page to
+show a month.
+
+### Categories come from the shared enum
+
+The plan fixes seven categories, and `expenseCategorySchema` was already defined for them, so the
+API validates against it and the app renders `EXPENSE_CATEGORY_LABELS` from the shared package.
+A new category is one edit in both places, not a string typed in a screen.
+
+### No receipt upload in this milestone
+
+The plan's storage decision is that receipt photos never reach the server; uploading them would
+also need a paid bucket or a second file API. The expense keeps the vendor, date, amount and note,
+which is what the totals need, and a receipt can stay in the phone's photos.

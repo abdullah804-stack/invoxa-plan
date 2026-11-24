@@ -342,3 +342,42 @@ export interface RecurringSchedule {
   lastError: string | null;
   createdAt: string;
 }
+
+export type ExpenseCategory =
+  'software' | 'travel' | 'meals' | 'supplies' | 'equipment' | 'fees' | 'other';
+
+export interface Expense {
+  id: string;
+  date: string;
+  category: ExpenseCategory;
+  description: string;
+  vendor: string | null;
+  amount: number;
+  currency: string;
+  taxMinor: number;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface ExpenseInput {
+  date: string;
+  category: ExpenseCategory;
+  description: string;
+  vendor?: string;
+  amount: number;
+  currency: string;
+  taxMinor?: number;
+  notes?: string;
+}
+
+export interface ExpenseTotal {
+  currency: string;
+  amount: number;
+  count: number;
+}
+
+export interface ExpenseListResponse {
+  expenses: Expense[];
+  totals: ExpenseTotal[];
+  month: { from: string; to: string; totals: ExpenseTotal[] };
+}

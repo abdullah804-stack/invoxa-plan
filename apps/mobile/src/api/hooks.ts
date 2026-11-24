@@ -6,7 +6,9 @@ import {
   createSavedItem,
   deleteClient,
   deleteDocument,
+  createExpense,
   createRecurring,
+  deleteExpense,
   deleteRecurring,
   draftWithAi,
   duplicateDocument,
@@ -14,11 +16,13 @@ import {
   fetchBrandAsset,
   fetchClient,
   fetchDocument,
+  fetchExpense,
   fetchProfile,
   fetchSummary,
   issueDocument,
   listClients,
   listDocuments,
+  listExpenses,
   listRecurring,
   listSavedItems,
   recordPayment,
@@ -27,6 +31,7 @@ import {
   setDocumentStatus,
   updateClient,
   updateDocument,
+  updateExpense,
   updateProfile,
   updateRecurring,
   uploadLogo,
@@ -38,6 +43,8 @@ import type {
   DocumentDraftBody,
   DocumentListParams,
   DocumentRecord,
+  ExpenseCategory,
+  ExpenseInput,
   PaymentInput,
   Profile,
   RecurringSchedule,
@@ -60,6 +67,9 @@ export const queryKeys = {
   brandAsset: (businessId: string | null, id: string) => ['brand-asset', businessId, id] as const,
   reminders: (businessId: string | null) => ['reminders', businessId] as const,
   recurring: (businessId: string | null) => ['recurring', businessId] as const,
+  expenses: (businessId: string | null, params: { category?: ExpenseCategory }) =>
+    ['expenses', businessId, params] as const,
+  expense: (businessId: string | null, id: string) => ['expense', businessId, id] as const,
 };
 
 export function useProfile() {
@@ -70,6 +80,55 @@ export function useProfile() {
     enabled: status === 'signedIn' && Boolean(activeBusinessId),
     staleTime: 30_000,
   });
+}
+
+export function useExpenses(params: { category?: ExpenseCategory } = {}) {
+  const { status, activeBusinessId } = useSession();
+  return useQuery({
+    queryKey: queryKeys.expenses(activeBusinessId, params),
+    queryFn: () => listExpenses(params),
+    enabled: status === 'signedIn' && Boolean(activeBusinessId),
+  });
+}
+
+export function useExpense(id: string | undefined) {
+  const { status, activeBusinessId } = useSession();
+  return useQuery({
+    queryKey: queryKeys.expense(activeBusinessId, id ?? ''),
+    queryFn: () => fetchExpense(id as string),
+    enabled: status === 'signedIn' && Boolean(activeBusinessId) && Boolean(id),
+  });
+}
+
+function useExpenseInvalidation(id?: string) {
+  const queryClient = useQueryClient();
+  const { activeBusinessId } = useSession();
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: ['expenses', activeBusinessId] });
+    if (id)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.expense(activeBusinessId, id) });
+  };
+}
+
+export function useCreateExpense() {
+  const invalidate = useExpenseInvalidation();
+  return useMutation({
+    mutationFn: (input: ExpenseInput) => createExpense(input),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateExpense(id: string) {
+  const invalidate = useExpenseInvalidation(id);
+  return useMutation({
+    mutationFn: (input: Partial<ExpenseInput>) => updateExpense(id, input),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteExpense() {
+  const invalidate = useExpenseInvalidation();
+  return useMutation({ mutationFn: (id: string) => deleteExpense(id), onSuccess: invalidate });
 }
 
 export function useReminders() {

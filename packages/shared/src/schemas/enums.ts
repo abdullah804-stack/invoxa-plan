@@ -46,7 +46,7 @@ export const headerLayoutSchema = z.enum(['logo-left', 'logo-right', 'centered']
 
 export const pageSizeSchema = z.enum(['A4', 'LETTER']);
 
-export const expenseCategorySchema = z.enum([
+export const EXPENSE_CATEGORIES = [
   'software',
   'travel',
   'meals',
@@ -54,7 +54,10 @@ export const expenseCategorySchema = z.enum([
   'equipment',
   'fees',
   'other',
-]);
+] as const;
+
+export const expenseCategorySchema = z.enum(EXPENSE_CATEGORIES);
+export type ExpenseCategory = z.infer<typeof expenseCategorySchema>;
 
 export const roleSchema = z.enum(['owner', 'staff', 'viewer']);
 

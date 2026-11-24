@@ -12,6 +12,10 @@ import type {
   DocumentListParams,
   DocumentListResponse,
   DocumentRecord,
+  Expense,
+  ExpenseCategory,
+  ExpenseInput,
+  ExpenseListResponse,
   PaymentInput,
   Profile,
   RecurringSchedule,
@@ -275,3 +279,40 @@ export function runRecurring(): Promise<{
 }
 
 export type { Business, DocumentRecord };
+
+export function listExpenses(
+  params: {
+    from?: string;
+    to?: string;
+    category?: ExpenseCategory;
+    limit?: number;
+  } = {},
+): Promise<ExpenseListResponse> {
+  return apiRequest<ExpenseListResponse>('/expenses', {
+    query: {
+      from: params.from,
+      to: params.to,
+      category: params.category,
+      limit: params.limit,
+    },
+  });
+}
+
+export function fetchExpense(id: string): Promise<{ expense: Expense }> {
+  return apiRequest<{ expense: Expense }>(`/expenses/${id}`);
+}
+
+export function createExpense(input: ExpenseInput): Promise<{ expense: Expense }> {
+  return apiRequest<{ expense: Expense }>('/expenses', { method: 'POST', body: input });
+}
+
+export function updateExpense(
+  id: string,
+  input: Partial<ExpenseInput>,
+): Promise<{ expense: Expense }> {
+  return apiRequest<{ expense: Expense }>(`/expenses/${id}`, { method: 'PUT', body: input });
+}
+
+export function deleteExpense(id: string): Promise<void> {
+  return apiRequest<void>(`/expenses/${id}`, { method: 'DELETE' });
+}

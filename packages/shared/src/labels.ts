@@ -1,4 +1,5 @@
 import type { DocumentType, ShownStatus } from './status.js';
+import type { ExpenseCategory } from './schemas/enums.js';
 
 /**
  * English invoice labels. English is required; two extra languages are added in
@@ -87,6 +88,16 @@ export const DOCUMENT_TITLES: Record<DocumentType, string> = {
   invoice: LABELS.invoice,
   estimate: LABELS.estimate,
   credit_note: LABELS.creditNote,
+};
+
+export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
+  software: 'Software',
+  travel: 'Travel',
+  meals: 'Meals',
+  supplies: 'Supplies',
+  equipment: 'Equipment',
+  fees: 'Fees',
+  other: 'Other',
 };
 
 export const STATUS_LABELS: Record<ShownStatus, string> = {

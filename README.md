@@ -28,7 +28,7 @@ npm run dev:api      # Fastify API on PORT (default 4000)
 npm run dev:mobile   # Expo app (Expo Go or a dev build)
 ```
 
-### API (M2–M8)
+### API (M2–M9)
 
 Base path `/api/v1`. All routes except `register`, `login` and `health` need
 `Authorization: Bearer <jwt>`; business routes read `X-Business-Id` (first business if absent)
@@ -67,7 +67,7 @@ Until both exist the run skips with a warning instead of failing. GitHub can del
 scheduled run, so the endpoint stays idempotent and the app calls it on open as well; a workflow is
 also disabled after 60 days without repository activity.
 
-### Mobile (M4–M8)
+### Mobile (M4–M9)
 
 Expo Router app with an auth gate, SecureStore session, light and dark theme tokens, a three-step
 brand setup, a document editor with live shared totals, document detail actions and the client
@@ -105,6 +105,9 @@ npm run dev:mobile                             # then scan the QR code or press 
 - An invoice can be repeated weekly, monthly or yearly from its screen. Each occurrence is a draft
   made on app open or by the daily job, and the schedule can be paused, resumed or stopped under
   Settings → Recurring invoices.
+- The Expenses tab records what the business spends, by category and day, with this month's total
+  per currency. Receipt photos stay on the phone; only the amount, date, category and note are
+  stored.
 
 ## Rules this codebase follows
 

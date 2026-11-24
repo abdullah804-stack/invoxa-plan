@@ -9,3 +9,4 @@ export * from './auth.js';
 export * from './api.js';
 export * from './ai.js';
 export * from './recurring.js';
+export * from './expense.js';
