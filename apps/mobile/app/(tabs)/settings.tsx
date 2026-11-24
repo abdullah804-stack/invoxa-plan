@@ -1,4 +1,4 @@
-import { can } from '@invoxa/shared';
+import { can, type SupportedLanguage } from '@invoxa/shared';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
@@ -16,6 +16,12 @@ import { errorMessage } from '../../src/lib/errors';
 import { ensureNotificationPermission } from '../../src/lib/reminders';
 import { spacing, typeScale, type ThemeMode } from '../../src/theme/tokens';
 import { useTheme } from '../../src/theme/ThemeProvider';
+
+const LANGUAGE_OPTIONS: { value: SupportedLanguage; label: string }[] = [
+  { value: 'en', label: 'English' },
+  { value: 'es', label: 'Español' },
+  { value: 'fr', label: 'Français' },
+];
 
 const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
   { value: 'light', label: 'Light' },
@@ -41,6 +47,8 @@ export default function SettingsScreen() {
   const [reminderHour, setReminderHour] = useState('9');
   const [reminderDays, setReminderDays] = useState('2');
   const [reminderNotice, setReminderNotice] = useState<string | null>(null);
+  const [language, setLanguage] = useState<SupportedLanguage>('en');
+  const [languageNotice, setLanguageNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const reminders = business?.reminders;
@@ -49,6 +57,23 @@ export default function SettingsScreen() {
     setReminderHour(String(reminders.hour));
     setReminderDays(String(reminders.daysBefore));
   }, [business?.id, business?.reminders]);
+
+  useEffect(() => {
+    const saved = business?.language;
+    if (saved === 'en' || saved === 'es' || saved === 'fr') setLanguage(saved);
+  }, [business?.language]);
+
+  const saveLanguage = async (value: SupportedLanguage) => {
+    const previous = language;
+    setLanguage(value);
+    setLanguageNotice(null);
+    try {
+      await updateProfile.mutateAsync({ language: value });
+    } catch (error) {
+      setLanguage(previous);
+      setLanguageNotice(errorMessage(error));
+    }
+  };
 
   const saveReminders = async () => {
     setReminderNotice(null);
@@ -131,6 +156,26 @@ export default function SettingsScreen() {
                     {business.numbering.invoice}-
                   </Text>
                 </View>
+              </View>
+            ) : null}
+            {business && canManageReminders ? (
+              <View style={[styles.languageBlock, { borderTopColor: colors.border }]}>
+                <Text style={[styles.metaLabel, { color: colors.textMuted }]}>
+                  Invoice language
+                </Text>
+                <Segmented
+                  options={LANGUAGE_OPTIONS}
+                  value={language}
+                  onChange={(value) => void saveLanguage(value)}
+                  accessibilityLabel="Invoice language"
+                />
+                <Text style={[styles.hint, { color: colors.textMuted }]}>
+                  New invoices and PDFs print in this language. Issued ones keep the language they
+                  were sent with.
+                </Text>
+                {languageNotice ? (
+                  <Text style={[styles.hint, { color: colors.danger }]}>{languageNotice}</Text>
+                ) : null}
               </View>
             ) : null}
           </Card>
@@ -336,6 +381,12 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     paddingTop: spacing.md,
     gap: spacing.md,
+  },
+  languageBlock: {
+    gap: spacing.sm,
+    borderTopWidth: 1,
+    marginTop: spacing.sm,
+    paddingTop: spacing.md,
   },
   meta: {
     flex: 1,

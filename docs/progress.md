@@ -287,3 +287,24 @@ project, time and billing validation), 89 API tests (6 new for totals, billing a
 immutability of billed time, permissions, tenant isolation and deletion rules), strict TypeScript,
 ESLint, Prettier, and Android and web Metro bundles. No screen was clicked here, because no phone is
 attached to this workspace — the visual and device checks for M4–M10 are still unverified.
+
+## M11 — Extra invoice languages (week 11) — built
+
+- [x] `labels.ts` carries three complete dictionaries — English, Spanish and French — with exactly
+      the same keys, enforced by a test so a template can never reference a missing string
+- [x] `labelsFor()`, `label()` and `documentTitles()` resolve a full tag to its base language
+      (`es-MX` → Spanish, `fr-CA` → French) and fall back to English for anything unsupported
+- [x] The HTML renderer prints every label, document title, payment method and status stamp from the
+      document's language: headers, table columns, totals, notes, stamps and footer
+- [x] Money and dates use the same language through `Intl`, and `<html lang>` reflects the
+      dictionary actually used, so a screen reader and the PDF agree
+- [x] Settings → Business has an Invoice language selector (owner or staff) that saves through the
+      existing profile update; the language is already stored on the business and copied into each
+      document's brand snapshot, so issued invoices keep theirs
+- [x] New tests: all three dictionaries share keys and none is blank, plus renderer checks for
+      Spanish, French, a regional tag and an unsupported language
+
+**Done when:** a business can send the same invoice in English, Spanish or French without editing a
+template. What is verified: 93 shared tests (7 new for dictionary parity, label resolution and the
+three renderings), 89 API tests, strict TypeScript, ESLint, Prettier, and Android and web Metro
+bundles. No screen was clicked here, because no phone is attached to this workspace.

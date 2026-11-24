@@ -2,9 +2,13 @@ import type { DocumentType, ShownStatus } from './status.js';
 import type { ExpenseCategory } from './schemas/enums.js';
 
 /**
- * English invoice labels. English is required; two extra languages are added in
- * M10 (week 11) with the same keys. Every user-facing string on the PDF and the
- * screens comes from here so translations cannot drift.
+ * Invoice labels in every language Invoxa prints. English is required; Spanish
+ * and French are the plan's two extra languages (see docs/decisions.md). Every
+ * dictionary has exactly the same keys — a test enforces that — so a screen or a
+ * template can never reference a string that exists in only one language.
+ *
+ * `language` is a BCP 47 tag such as `es` or `fr-CA`; the base language picks
+ * the dictionary and unknown languages fall back to English.
  */
 
 export const LABELS = {
@@ -79,11 +83,170 @@ export const LABELS = {
 } as const;
 
 export type LabelKey = keyof typeof LABELS;
+export type Labels = Record<LabelKey, string>;
 
-export function label(key: LabelKey): string {
-  return LABELS[key];
+/** Spanish labels for every key in `LABELS`. */
+const ES: Labels = {
+  invoice: 'Factura',
+  estimate: 'Presupuesto',
+  creditNote: 'Nota de crédito',
+  receipt: 'Recibo',
+  statement: 'Estado de cuenta',
+
+  billTo: 'Facturar a',
+  from: 'De',
+
+  issueDate: 'Fecha de emisión',
+  dueDate: 'Fecha de vencimiento',
+  validUntil: 'Válido hasta',
+  reference: 'Referencia',
+  paymentDate: 'Fecha de pago',
+
+  description: 'Descripción',
+  quantity: 'Cant.',
+  unitPrice: 'Precio unitario',
+  discount: 'Descuento',
+  amount: 'Importe',
+
+  subtotal: 'Subtotal',
+  taxAdded: 'Impuesto',
+  taxIncluded: 'Impuesto (incluido)',
+  total: 'Total',
+  amountPaid: 'Importe pagado',
+  payments: 'Pagos',
+  balanceDue: 'Saldo pendiente',
+  lateFee: 'Recargo por mora',
+  creditApplied: 'Crédito aplicado',
+  clientCredit: 'Crédito del cliente',
+
+  paymentInstructions: 'Instrucciones de pago',
+  paymentLink: 'Pagar en línea',
+  notes: 'Notas',
+  terms: 'Términos',
+  signature: 'Firma',
+  page: 'Página',
+  of: 'de',
+
+  draft: 'BORRADOR',
+  paid: 'PAGADA',
+  void: 'ANULADA',
+  overdue: 'Vencida',
+  expired: 'Caducada',
+  unused: 'Sin usar',
+
+  cash: 'Efectivo',
+  bankTransfer: 'Transferencia bancaria',
+  card: 'Tarjeta',
+  mobileMoney: 'Dinero móvil',
+  cheque: 'Cheque',
+  creditNoteMethod: 'Nota de crédito',
+  other: 'Otro',
+
+  noInvoices: 'Aún no hay facturas. Crea la primera.',
+  recordPayment: 'Registrar pago',
+  markSent: 'Marcar como enviada',
+  sharePdf: 'Compartir PDF',
+};
+
+/** French labels for every key in `LABELS`. */
+const FR: Labels = {
+  invoice: 'Facture',
+  estimate: 'Devis',
+  creditNote: 'Avoir',
+  receipt: 'Reçu',
+  statement: 'Relevé',
+
+  billTo: 'Facturer à',
+  from: 'De',
+
+  issueDate: "Date d'émission",
+  dueDate: "Date d'échéance",
+  validUntil: "Valable jusqu'au",
+  reference: 'Référence',
+  paymentDate: 'Date de paiement',
+
+  description: 'Désignation',
+  quantity: 'Qté',
+  unitPrice: 'Prix unitaire',
+  discount: 'Remise',
+  amount: 'Montant',
+
+  subtotal: 'Sous-total',
+  taxAdded: 'Taxe',
+  taxIncluded: 'Taxe (incluse)',
+  total: 'Total',
+  amountPaid: 'Montant payé',
+  payments: 'Paiements',
+  balanceDue: 'Solde dû',
+  lateFee: 'Pénalité de retard',
+  creditApplied: 'Avoir appliqué',
+  clientCredit: 'Crédit client',
+
+  paymentInstructions: 'Instructions de paiement',
+  paymentLink: 'Payer en ligne',
+  notes: 'Notes',
+  terms: 'Conditions',
+  signature: 'Signature',
+  page: 'Page',
+  of: 'sur',
+
+  draft: 'BROUILLON',
+  paid: 'PAYÉE',
+  void: 'ANNULÉE',
+  overdue: 'En retard',
+  expired: 'Expirée',
+  unused: 'Non utilisé',
+
+  cash: 'Espèces',
+  bankTransfer: 'Virement bancaire',
+  card: 'Carte',
+  mobileMoney: 'Paiement mobile',
+  cheque: 'Chèque',
+  creditNoteMethod: 'Avoir',
+  other: 'Autre',
+
+  noInvoices: "Aucune facture pour l'instant. Créez la première.",
+  recordPayment: 'Enregistrer un paiement',
+  markSent: 'Marquer comme envoyée',
+  sharePdf: 'Partager le PDF',
+};
+
+export const SUPPORTED_LANGUAGES = ['en', 'es', 'fr'] as const;
+export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
+
+export const LABELS_BY_LANGUAGE: Record<SupportedLanguage, Labels> = {
+  en: LABELS,
+  es: ES,
+  fr: FR,
+};
+
+/** The supported base language for a tag such as `es-MX`, or `en` if unknown. */
+export function resolveLanguage(language?: string | null): SupportedLanguage {
+  const base = (language ?? '').trim().toLowerCase().split('-')[0] ?? '';
+  return (SUPPORTED_LANGUAGES as readonly string[]).includes(base)
+    ? (base as SupportedLanguage)
+    : 'en';
 }
 
+export function labelsFor(language?: string | null): Labels {
+  return LABELS_BY_LANGUAGE[resolveLanguage(language)];
+}
+
+export function label(key: LabelKey, language?: string | null): string {
+  return labelsFor(language)[key];
+}
+
+/** Titles keyed by document type, in the requested language. */
+export function documentTitles(language?: string | null): Record<DocumentType, string> {
+  const labels = labelsFor(language);
+  return {
+    invoice: labels.invoice,
+    estimate: labels.estimate,
+    credit_note: labels.creditNote,
+  };
+}
+
+/** English titles, kept for screens that are not translated. */
 export const DOCUMENT_TITLES: Record<DocumentType, string> = {
   invoice: LABELS.invoice,
   estimate: LABELS.estimate,

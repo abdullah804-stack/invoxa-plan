@@ -1,6 +1,6 @@
 import { formatDate, formatMoney } from './format.js';
 import { computeTotals, type InvoiceDiscount, type TaxMode } from './totals.js';
-import { DOCUMENT_TITLES, LABELS } from './labels.js';
+import { documentTitles, labelsFor, resolveLanguage, type Labels } from './labels.js';
 import type { DocumentType, ShownStatus } from './status.js';
 
 /**
@@ -85,15 +85,17 @@ export interface RenderInvoiceInput {
 
 const DEFAULT_COLOR = '#1F5F4A';
 
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  cash: LABELS.cash,
-  bank_transfer: LABELS.bankTransfer,
-  card: LABELS.card,
-  mobile_money: LABELS.mobileMoney,
-  cheque: LABELS.cheque,
-  credit_note: LABELS.creditNoteMethod,
-  other: LABELS.other,
-};
+function paymentMethodLabels(labels: Labels): Record<string, string> {
+  return {
+    cash: labels.cash,
+    bank_transfer: labels.bankTransfer,
+    card: labels.card,
+    mobile_money: labels.mobileMoney,
+    cheque: labels.cheque,
+    credit_note: labels.creditNoteMethod,
+    other: labels.other,
+  };
+}
 
 export function escapeHtml(value: string): string {
   return value
@@ -161,10 +163,12 @@ function pageDimensions(pageSize: PageSize): { width: string; height: string; cs
     : { width: '210mm', height: '297mm', cssSize: 'A4' };
 }
 
-function stampFor(status: ShownStatus): string {
-  if (status === 'paid') return `<span class="stamp stamp-paid">${LABELS.paid}</span>`;
-  if (status === 'void') return `<span class="stamp stamp-void">${LABELS.void}</span>`;
-  if (status === 'overdue') return `<span class="stamp stamp-overdue">${LABELS.overdue}</span>`;
+function stampFor(status: ShownStatus, labels: Labels): string {
+  if (status === 'paid') return `<span class="stamp stamp-paid">${labels.paid}</span>`;
+  if (status === 'void') return `<span class="stamp stamp-void">${labels.void}</span>`;
+  if (status === 'overdue') {
+    return `<span class="stamp stamp-overdue">${labels.overdue}</span>`;
+  }
   return '';
 }
 
@@ -172,6 +176,7 @@ export function renderInvoiceHtml(input: RenderInvoiceInput): string {
   const { document, business, client, brand } = input;
   const language =
     brand.language && /^[a-z]{2}(-[A-Z]{2})?$/.test(brand.language) ? brand.language : 'en';
+  const labels = labelsFor(language);
   const currency = document.currency;
   const color = safeColor(brand.color);
   const onBrand = readableOn(color);
@@ -195,7 +200,7 @@ export function renderInvoiceHtml(input: RenderInvoiceInput): string {
   const date = (value: string | null | undefined): string =>
     value ? formatDate(value, language) : '';
 
-  const title = DOCUMENT_TITLES[document.docType];
+  const title = documentTitles(language)[document.docType];
   const logo = safeImage(brand.logoDataUrl);
   const signature = safeImage(brand.signatureDataUrl);
   const paymentLink = safeHttpsLink(brand.paymentLink);
@@ -219,15 +224,15 @@ export function renderInvoiceHtml(input: RenderInvoiceInput): string {
 
   const metaRows: { label: string; value: string }[] = [];
   if (document.issueDate)
-    metaRows.push({ label: LABELS.issueDate, value: date(document.issueDate) });
+    metaRows.push({ label: labels.issueDate, value: date(document.issueDate) });
   if (document.docType === 'estimate') {
     if (document.validUntil) {
-      metaRows.push({ label: LABELS.validUntil, value: date(document.validUntil) });
+      metaRows.push({ label: labels.validUntil, value: date(document.validUntil) });
     }
   } else if (document.dueDate) {
-    metaRows.push({ label: LABELS.dueDate, value: date(document.dueDate) });
+    metaRows.push({ label: labels.dueDate, value: date(document.dueDate) });
   }
-  if (document.reference) metaRows.push({ label: LABELS.reference, value: document.reference });
+  if (document.reference) metaRows.push({ label: labels.reference, value: document.reference });
 
   const rows = document.items
     .map((item, index) => {
@@ -252,27 +257,27 @@ export function renderInvoiceHtml(input: RenderInvoiceInput): string {
     .join('');
 
   const totalRows: { label: string; value: string; className?: string }[] = [
-    { label: LABELS.subtotal, value: money(totals.subtotal) },
+    { label: labels.subtotal, value: money(totals.subtotal) },
   ];
   if (totals.discount > 0) {
-    totalRows.push({ label: LABELS.discount, value: `-${money(totals.discount)}` });
+    totalRows.push({ label: labels.discount, value: `-${money(totals.discount)}` });
   }
   if (totals.lateFees > 0) {
-    totalRows.push({ label: LABELS.lateFee, value: money(totals.lateFees) });
+    totalRows.push({ label: labels.lateFee, value: money(totals.lateFees) });
   }
   if (totals.tax > 0) {
     totalRows.push({
-      label: document.taxMode === 'included' ? LABELS.taxIncluded : LABELS.taxAdded,
+      label: document.taxMode === 'included' ? labels.taxIncluded : labels.taxAdded,
       value: money(totals.tax),
     });
   }
-  totalRows.push({ label: LABELS.total, value: money(totals.total), className: 'grand' });
+  totalRows.push({ label: labels.total, value: money(totals.total), className: 'grand' });
   if (totals.paid > 0) {
-    totalRows.push({ label: LABELS.amountPaid, value: `-${money(totals.paid)}` });
+    totalRows.push({ label: labels.amountPaid, value: `-${money(totals.paid)}` });
   }
   if (totals.paid > 0 || totals.lateFees > 0 || totals.discount > 0) {
     totalRows.push({
-      label: LABELS.balanceDue,
+      label: labels.balanceDue,
       value: money(totals.balance),
       className: 'balance',
     });
@@ -288,13 +293,13 @@ export function renderInvoiceHtml(input: RenderInvoiceInput): string {
   const paymentsHtml =
     document.payments && document.payments.length > 0
       ? `<div class="payments">
-          <div class="section-title">${LABELS.payments}</div>
+          <div class="section-title">${labels.payments}</div>
           ${document.payments
             .map(
               (payment) => `<div class="payment">
                 <span>${money(payment.amount)}</span>
                 <span>${escapeHtml(
-                  PAYMENT_METHOD_LABELS[payment.method] ?? payment.method,
+                  paymentMethodLabels(labels)[payment.method] ?? payment.method,
                 )} · ${date(payment.paidAt.slice(0, 10))}${
                   payment.reference ? ` · ${escapeHtml(payment.reference)}` : ''
                 }</span>
@@ -305,39 +310,39 @@ export function renderInvoiceHtml(input: RenderInvoiceInput): string {
       : '';
 
   const notesHtml = document.notes
-    ? `<div class="note"><div class="section-title">${LABELS.notes}</div><p>${escapeHtml(
+    ? `<div class="note"><div class="section-title">${labels.notes}</div><p>${escapeHtml(
         document.notes,
       )}</p></div>`
     : '';
   const termsHtml = document.terms
-    ? `<div class="note"><div class="section-title">${LABELS.terms}</div><p>${escapeHtml(
+    ? `<div class="note"><div class="section-title">${labels.terms}</div><p>${escapeHtml(
         document.terms,
       )}</p></div>`
     : '';
   const instructionsHtml = brand.paymentInstructions
-    ? `<div class="note"><div class="section-title">${LABELS.paymentInstructions}</div><p>${escapeHtml(
+    ? `<div class="note"><div class="section-title">${labels.paymentInstructions}</div><p>${escapeHtml(
         brand.paymentInstructions,
       )}</p></div>`
     : '';
   const linkHtml = paymentLink
     ? `<div class="note"><a class="pay-link" href="${escapeHtml(
         paymentLink,
-      )}">${LABELS.paymentLink}</a></div>`
+      )}">${labels.paymentLink}</a></div>`
     : '';
   const signatureHtml = signature
-    ? `<div class="signature"><img src="${signature}" alt="${LABELS.signature}"><div class="signature-label">${LABELS.signature}</div></div>`
+    ? `<div class="signature"><img src="${signature}" alt="${labels.signature}"><div class="signature-label">${labels.signature}</div></div>`
     : '';
 
   const footerContact = [
     business.website ?? '',
-    business.taxId ? `${LABELS.from} · ${business.taxId}` : '',
+    business.taxId ? `${labels.from} · ${business.taxId}` : '',
   ]
     .filter((value) => value !== '')
     .map((value) => escapeHtml(value))
     .join(' · ');
 
   return `<!doctype html>
-<html lang="${language}">
+<html lang="${resolveLanguage(language)}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -554,14 +559,14 @@ export function renderInvoiceHtml(input: RenderInvoiceInput): string {
     </div>
     <div class="doc">
       <div class="doc-type">${escapeHtml(title)}</div>
-      <div class="doc-number">${escapeHtml(document.number ?? LABELS.draft)}</div>
-      ${stampFor(document.shownStatus)}
+      <div class="doc-number">${escapeHtml(document.number ?? labels.draft)}</div>
+      ${stampFor(document.shownStatus, labels)}
     </div>
   </header>
 
   <section class="parties">
     <div class="party">
-      <div class="party-label">${LABELS.billTo}</div>
+      <div class="party-label">${labels.billTo}</div>
       <div class="party-name">${escapeHtml(client.name)}</div>
       <div class="party-details">${clientDetails}</div>
     </div>
@@ -580,11 +585,11 @@ export function renderInvoiceHtml(input: RenderInvoiceInput): string {
   <table class="lines">
     <thead>
       <tr>
-        <th class="col-description">${LABELS.description}</th>
-        <th class="num">${LABELS.quantity}</th>
-        <th class="num">${LABELS.unitPrice}</th>
-        ${hasLineDiscount ? `<th class="num">${LABELS.discount}</th>` : ''}
-        <th class="num">${LABELS.amount}</th>
+        <th class="col-description">${labels.description}</th>
+        <th class="num">${labels.quantity}</th>
+        <th class="num">${labels.unitPrice}</th>
+        ${hasLineDiscount ? `<th class="num">${labels.discount}</th>` : ''}
+        <th class="num">${labels.amount}</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
@@ -605,7 +610,7 @@ export function renderInvoiceHtml(input: RenderInvoiceInput): string {
   </section>
 
   <footer>
-    <div>${escapeHtml(business.name)} · ${escapeHtml(document.number ?? LABELS.draft)}</div>
+    <div>${escapeHtml(business.name)} · ${escapeHtml(document.number ?? labels.draft)}</div>
     <div>${footerContact}</div>
   </footer>
 </div>

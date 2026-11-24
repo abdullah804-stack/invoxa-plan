@@ -219,3 +219,47 @@ describe('renderInvoiceHtml', () => {
     expect(html).toContain('EST-0003');
   });
 });
+
+describe('renderInvoiceHtml in other languages', () => {
+  it('prints Spanish labels, dates and money for es-MX', () => {
+    const base = input();
+    const html = renderInvoiceHtml({
+      ...base,
+      brand: { ...base.brand, language: 'es-MX' },
+    });
+    expect(html).toContain('<html lang="es">');
+    expect(html).toContain('Factura');
+    expect(html).toContain('Facturar a');
+    expect(html).toContain('Fecha de vencimiento');
+    expect(html).toContain('Descripción');
+    expect(html).toContain('Total');
+    expect(html).not.toContain('>Invoice<');
+    expect(html).not.toContain('Bill to');
+  });
+
+  it('prints French labels for fr-CA', () => {
+    const base = input();
+    const html = renderInvoiceHtml({
+      ...base,
+      brand: { ...base.brand, language: 'fr-CA' },
+    });
+    expect(html).toContain('<html lang="fr">');
+    expect(html).toContain('Facture');
+    expect(html).toContain('Facturer à');
+    expect(html).toContain("Date d'échéance");
+    expect(html).toContain('Désignation');
+    expect(html).toContain('Sous-total');
+    expect(html).not.toContain('Bill to');
+  });
+
+  it('falls back to English for a language without a dictionary', () => {
+    const base = input();
+    const html = renderInvoiceHtml({
+      ...base,
+      brand: { ...base.brand, language: 'de' },
+    });
+    expect(html).toContain('<html lang="en">');
+    expect(html).toContain('Invoice');
+    expect(html).toContain('Bill to');
+  });
+});

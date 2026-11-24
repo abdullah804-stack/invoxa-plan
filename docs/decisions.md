@@ -396,3 +396,27 @@ project can be removed.
 
 Billing a project sets the project on the draft it creates; invoices written by hand keep their
 existing client snapshot. An optional project picker in the editor is a later, smaller change.
+
+## 24 November 2026 — Week 11
+
+### Dictionaries live beside the renderer, not in the app
+
+The PDF is produced from shared HTML, so the labels must travel with that HTML. `labels.ts` holds
+one complete dictionary per language and the renderer reads only from the dictionary of the
+document's language. A test asserts that Spanish and French have exactly the English keys and that
+no value is blank, which is what keeps a new label from silently appearing in English on a French
+invoice.
+
+### Regional tags resolve to their base language
+
+A business may store `es-MX` or `fr-CA`; the base language picks the dictionary while `Intl` still
+formats money and dates with the full tag. Unknown languages fall back to English, and `<html lang>`
+names the dictionary that was actually used rather than a language with no labels.
+
+### Language is a business setting frozen per document
+
+The business profile's existing `language` field now has a Settings control. Documents copy the
+language into their brand snapshot when they are created, so changing the setting only affects new
+invoices — an issued invoice is never reprinted in a different language. The app's own screens stay
+English in this milestone; translating the product UI is a larger, separate job from translating
+the invoice a client receives.

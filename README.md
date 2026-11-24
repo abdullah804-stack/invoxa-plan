@@ -97,6 +97,9 @@ npm run dev:mobile                             # then scan the QR code or press 
   and outstanding per currency and the documents issued to them.
 - Every document has a preview built by the shared `renderInvoiceHtml`: the same HTML prints to a
   PDF that opens in the phone's share sheet. Three templates are chosen during brand onboarding.
+- Invoices print in English, Spanish or French. The language is a business setting (Settings →
+  Business → Invoice language) and is frozen into each document's brand snapshot when it is created,
+  so an issued invoice keeps the language it was sent with. Money and dates use the same locale.
 - Settings switches light, dark or system, and reopens the brand setup. Owners see the edit
   button; staff and viewers do not. A logo only appears after the upload has succeeded.
 - "Describe it" turns one sentence into an editable draft: after the one-time Gemini notice it

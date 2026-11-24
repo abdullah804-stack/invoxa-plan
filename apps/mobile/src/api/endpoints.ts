@@ -52,6 +52,7 @@ export interface ProfileUpdate {
   taxId?: string;
   website?: string;
   currency?: string;
+  language?: string;
   branding?: {
     color: string;
     template?: 'classic' | 'modern' | 'minimal';
