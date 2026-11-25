@@ -43,6 +43,22 @@ const BACKUP_EXPORT_LIMIT = { max: 20, timeWindow: '1 minute' };
 const BACKUP_RESTORE_LIMIT = { max: 10, timeWindow: '1 minute' };
 
 /**
+ * The app marks each upload with its part number, so a restore sent in parts
+ * writes one activity row for the whole restore rather than one per request.
+ * The marker is not part of the file's schema and is dropped by validation.
+ */
+function backupPart(body: unknown): { index: number; total: number } | null {
+  if (typeof body !== 'object' || body === null) return null;
+  const part = (body as { part?: unknown }).part;
+  if (typeof part !== 'object' || part === null) return null;
+  const { index, total } = part as { index?: unknown; total?: unknown };
+  if (typeof index !== 'number' || typeof total !== 'number') return null;
+  if (!Number.isInteger(index) || !Number.isInteger(total)) return null;
+  if (index < 1 || total < 1 || index > total || total > 1000) return null;
+  return { index, total };
+}
+
+/**
  * Every row in a collection, in _id order. A backup must never stop at a page
  * boundary: passing a limit to find() is what silently dropped every record
  * past the first 2,000, so this keeps reading until no rows remain.
@@ -378,6 +394,8 @@ export const backupRoutes: FastifyPluginAsync<BackupRouteOptions> = async (app, 
       requireAction(context, 'backup:restore');
 
       const input = parseOrThrow(backupSchema, request.body ?? {});
+      const part = backupPart(request.body);
+      const lastPart = !part || part.index === part.total;
 
       const business = await Business.findById(context.businessId);
       if (!business) {
@@ -741,11 +759,15 @@ export const backupRoutes: FastifyPluginAsync<BackupRouteOptions> = async (app, 
 
       await business.save();
 
-      await logActivity(context, {
-        type: 'business.updated',
-        summary: `Restored a backup: ${restored.documents} documents, ${restored.clients} clients`,
-        entityId: context.businessId,
-      });
+      if (lastPart) {
+        await logActivity(context, {
+          type: 'business.updated',
+          summary: part
+            ? `Restored a backup in ${part.total} parts`
+            : `Restored a backup: ${restored.documents} documents, ${restored.clients} clients`,
+          entityId: context.businessId,
+        });
+      }
 
       return {
         restored,

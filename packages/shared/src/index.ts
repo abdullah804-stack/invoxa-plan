@@ -20,4 +20,5 @@ export * from './ai.js';
 export * from './recurring.js';
 export * from './rules.js';
 export * from './permissions.js';
+export * from './backupParts.js';
 export * from './schemas/index.js';

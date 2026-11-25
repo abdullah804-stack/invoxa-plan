@@ -1,5 +1,7 @@
+import { writeFile } from 'node:fs/promises';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Types } from 'mongoose';
+import { splitBackupForUpload } from '@invoxa/shared';
 import type { FastifyInstance } from 'fastify';
 import {
   closeTestDb,
@@ -189,6 +191,73 @@ describe('week 15: hardening', () => {
       2_050,
     );
   });
+
+  it('restores a backup larger than the 8 MB body limit by sending it in parts', async () => {
+    const business = new Types.ObjectId(owner.businessId);
+    const huge = Array.from({ length: 180 }, (_, index) => ({
+      business,
+      clientUuid: `huge-${index}-${randomSuffix()}`,
+      docType: 'invoice',
+      status: 'draft',
+      number: null,
+      currency: 'USD',
+      items: Array.from({ length: 400 }, (_, line) => ({
+        id: `line-${line}`,
+        description: `Professional service line ${line} with a realistic description of the work`,
+        quantity: 1,
+        unitPrice: 1_000,
+      })),
+    }));
+    await Document.insertMany(huge);
+
+    const exported = await testApp.request().get('/api/v1/backup').set(headersFor(owner));
+    expect(exported.status).toBe(200);
+    const wholeBytes = Buffer.byteLength(JSON.stringify(exported.body), 'utf8');
+    expect(wholeBytes).toBeGreaterThan(8 * 1024 * 1024);
+
+    // Set BACKUP_FIXTURE_PATH to keep this file for the phone checklist's
+    // large-restore check.
+    const fixturePath = process.env['BACKUP_FIXTURE_PATH'];
+    if (fixturePath) {
+      await writeFile(fixturePath, JSON.stringify(exported.body), 'utf8');
+    }
+
+    // Each part has to fit the route's 8 MB body limit; the file as a whole does
+    // not, which is exactly why the upload is split.
+    const parts = splitBackupForUpload(exported.body, 6 * 1024 * 1024);
+    expect(parts.length).toBeGreaterThan(1);
+    for (const part of parts) {
+      expect(Buffer.byteLength(JSON.stringify(part), 'utf8')).toBeLessThanOrEqual(6 * 1024 * 1024);
+    }
+
+    const secondId = await newBusiness(owner, 'Big Restore');
+    let restoredDocuments = 0;
+    for (const part of parts) {
+      const restore = await testApp
+        .request()
+        .post('/api/v1/backup/restore')
+        .set(headersFor(owner, secondId))
+        .send(part);
+      expect(restore.status).toBe(200);
+      restoredDocuments += restore.body.restored.documents;
+    }
+    expect(restoredDocuments).toBe(huge.length);
+    expect(await Document.countDocuments({ business: new Types.ObjectId(secondId) })).toBe(
+      huge.length,
+    );
+
+    // One activity row for the whole restore, not one per part.
+    const activity = await testApp
+      .request()
+      .get('/api/v1/activity')
+      .set(headersFor(owner, secondId));
+    const restoreRows = (activity.body.entries as { summary: string }[]).filter((entry) =>
+      entry.summary.includes('Restored a backup'),
+    );
+    expect(restoreRows).toHaveLength(1);
+    expect(restoreRows[0]?.summary).toContain(`${parts.length} parts`);
+    // A 10 MB export and two restores need more than the default 30 s on CI.
+  }, 120_000);
 
   it('answers 404, never 403, for another business resource on every later route', async () => {
     const client = await testApp

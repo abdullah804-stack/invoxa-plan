@@ -47,6 +47,9 @@ read.
   SHA-256. A failed upload leaves the previous image in place.
 - Receipt scanning: `data:image/png|jpeg;base64` only, 4 MB request cap, image never stored.
 - Every other route keeps the 1 MB body limit; only the three backup routes raise it to 8 MB.
+- A backup larger than that limit is uploaded in dependency-ordered parts of at most 6 MB by the
+  shared `splitBackupForUpload`, so a successful export can always be restored. Each part keeps the
+  same merge rules and the marker is validated before it can affect logging.
 - `$`, dotted and prototype keys are stripped from bodies, queries and params before validation.
 
 ### Logs and secrets
@@ -143,9 +146,9 @@ tests where the server produces them, and by inspection on the client.
 Re-run in this milestone: the complete API suite (all earlier milestone files plus week 15) and the
 shared suite pass. The earlier device-dependent checks remain **unverified** for the same reason as
 in weeks 4–14: there is no phone or emulator in this workspace, no Gemini key, and no deployment.
-Specifically still to do on hardware: sign-up and restart, PDF share sheet, notification delivery,
-offline sync in airplane mode, biometric app lock, file picker and share sheet for a backup, and the
-release-candidate feel on a slow phone.
+Every one of those checks, from week 4's sign-up to week 15's slow-phone and large-restore runs, is
+written out in [`docs/phone-checklist.md`](./phone-checklist.md) with the expected result for each.
+Tick a milestone there only when its whole list passes.
 
 ## 7. Free-tier capacity
 

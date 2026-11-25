@@ -425,6 +425,11 @@ file was shared, because no device is attached to this workspace.
       in the file as documents
 - [x] Backup files without a client snapshot no longer contain `clientName: null`, which the
       shared schema refuses; a document with no client now exports cleanly
+- [x] A backup larger than the 8 MB restore body limit restores in dependency-ordered parts of at
+      most 6 MB, split by the shared `splitBackupForUpload`; preview and restore both chunk, merge
+      stays idempotent, and a multi-part restore writes one activity row
+- [x] `docs/phone-checklist.md` lists every device check weeks 4–15 could not run, with the expected
+      result for each and a fixture path for the large-restore case
 - [x] Security pass: scoped-helper audit, per-route rate limits (new: 20/min export, 10/min
       preview and restore), upload checks, log redaction, secret handling, dependency audit
 - [x] Ownership matrix for every resource, including weeks 8–14: clients, invoices, expenses,
@@ -444,7 +449,8 @@ file was shared, because no device is attached to this workspace.
 - [x] 6 new API tests in `week15.test.ts`
 
 **Done when:** no high or critical audit findings, every earlier acceptance test passes, and the app
-is usable on a slow phone with large text. What is verified: `npm audit --audit-level=high` exits 0
+is usable on a slow phone with large text. What is verified: a 10.8 MB export, larger than one
+request may carry, restores completely through the app's splitter with no duplicates and one log row; `npm audit --audit-level=high` exits 0
 (three moderate `minimatch` advisories inside Expo's build tooling remain and are documented), all
 shared and API tests pass including the new volume, recurring-restore, ownership and rate-limit
 cases, and contrast is measured from the real tokens. What is **not** verified: slow-phone scrolling,

@@ -1,3 +1,4 @@
+import { splitBackupForUpload } from '@invoxa/shared';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from '../auth/SessionProvider';
 import {
@@ -69,6 +70,7 @@ import {
   type ProfileUpdate,
 } from './endpoints';
 import type {
+  BackupCounts,
   BackupPreview,
   ClientListParams,
   DocumentDraftBody,
@@ -192,16 +194,79 @@ export function useExportBackup() {
   return useMutation({ mutationFn: fetchBackup });
 }
 
+const BACKUP_COUNT_KEYS = [
+  'clients',
+  'projects',
+  'documents',
+  'expenses',
+  'timeEntries',
+  'savedItems',
+  'recurring',
+] as const;
+
+function emptyCounts(): BackupCounts {
+  return {
+    clients: 0,
+    projects: 0,
+    documents: 0,
+    expenses: 0,
+    timeEntries: 0,
+    savedItems: 0,
+    recurring: 0,
+  };
+}
+
+function addCounts(target: BackupCounts, source: BackupCounts): void {
+  for (const key of BACKUP_COUNT_KEYS) target[key] += source[key];
+}
+
+/**
+ * A file can be larger than the restore route's body limit, so both calls split
+ * it into parts and add up what each part reports. Same file, same merge rules.
+ */
 export function usePreviewBackup() {
   return useMutation({
-    mutationFn: (file: unknown): Promise<BackupPreview> => previewBackup(file),
+    mutationFn: async (file: unknown): Promise<BackupPreview> => {
+      const counts = emptyCounts();
+      let existingDocuments = 0;
+      let exportedAt: string | null = null;
+
+      for (const part of splitBackupForUpload(file)) {
+        const preview = await previewBackup(part);
+        addCounts(counts, preview.counts);
+        existingDocuments += preview.existingDocuments;
+        exportedAt = exportedAt ?? preview.exportedAt;
+      }
+
+      return { counts, existingDocuments, exportedAt };
+    },
   });
 }
 
 export function useRestoreBackup() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (file: unknown): Promise<RestoreResult> => restoreBackup(file),
+    mutationFn: async (file: unknown): Promise<RestoreResult> => {
+      const restored = emptyCounts();
+      const skipped = { documents: 0, expenses: 0, timeEntries: 0, savedItems: 0, recurring: 0 };
+      let business: RestoreResult['business'] | null = null;
+
+      for (const part of splitBackupForUpload(file)) {
+        const result = await restoreBackup(part);
+        addCounts(restored, result.restored);
+        skipped.documents += result.skipped.documents;
+        skipped.expenses += result.skipped.expenses;
+        skipped.timeEntries += result.skipped.timeEntries;
+        skipped.savedItems += result.skipped.savedItems;
+        skipped.recurring += result.skipped.recurring;
+        business = result.business;
+      }
+
+      if (!business) {
+        throw new Error('The restore returned no business');
+      }
+      return { restored, skipped, business };
+    },
     onSuccess: () => {
       // A restore can change every number on every screen.
       queryClient.clear();

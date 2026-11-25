@@ -595,6 +595,19 @@ offer is a forced downgrade of Expo from 58 to 52. Anything that needs a phone â
 start, PDF time, 200% font layout â€” is listed as unverified in `docs/hardening.md` rather than
 claimed.
 
+### A file too big for one request is sent in parts
+
+Raising the restore body limit until it fits every business would trade a silent truncation for an
+out-of-memory crash on a 512 MB host. Instead the app splits the exported file with
+`splitBackupForUpload` (shared with the API tests) into parts of at most 6 MB, in dependency order:
+clients, projects, documents, recurring schedules, expenses, time entries, saved items, settings,
+then the two brand images. Restore already merges by `clientUuid`, name and contents, so a sequence
+of parts is equivalent to one request, and it stays exactly as idempotent: sending the same file
+again adds nothing. A single record larger than a part is refused with a clear error instead of
+being cut in half. Each part carries a `part: { index, total }` marker, which the schema drops; the
+route validates the marker and logs one activity row only on the last part, so a large restore does
+not fill the log with one row per request.
+
 ### Whole-business routes get their own limits
 
 `GET /backup`, `/backup/preview` and `/backup/restore` read or write an entire business and accept
