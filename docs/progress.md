@@ -489,3 +489,28 @@ to this workspace. See `docs/hardening.md` for the full list.
 nothing is deployed, no store build exists and no phone is attached. Everything that can be done
 without accounts is in the repository; `docs/release.md` is the remaining sequence, and it opens
 with the list of what is blocked.
+
+## M17 — The missing roadmap features — added
+
+**Goal:** close the twelve features the week 7, 8, 10 and 11 task lists asked for but the milestone
+commits did not build.
+
+- [x] Receipt PDF and client statement PDF, from the shared renderer and new API endpoints
+- [x] CSV export for documents and expenses: BOM, quoted cells, no formula injection, plain decimals
+- [x] Cash-flow, aging, sales-by-client and tax reports, with the rules in `packages/shared/src/reports.ts`
+- [x] Tax presets screen in Settings, and preset chips in the invoice editor
+- [x] QR code for the payment link, generated on the server from the stored https link
+- [x] Refine with AI for notes (`POST /ai/refine`), with the shared daily cap and refund on failure
+- [x] Reminder message sheet with WhatsApp, email and share links, in the invoice language
+- [x] Offline drafts: a device queue, `POST /sync/invoices` with per-item results and conflicts, a
+      cached dashboard and invoice list, and a sync banner
+- [x] Voice drafting on the Describe-it screen, hidden where speech recognition cannot run
+- [x] 13 shared tests (`reports.test.ts`) and 8 API tests (`week17.test.ts`); suite is 117 shared +
+      132 API, all green; web and Android bundles build; lint and typecheck clean
+- [ ] The device half of the checklist: PDFs, share sheet, WhatsApp/email hand-off, speech and
+      airplane-mode sync — no phone or emulator is attached
+- [ ] Live Gemini quality for refine — needs `GEMINI_API_KEY`
+
+**Done when:** every week 7/8/10/11 feature has code, a route or screen, and a test where the rule is
+pure. That is met; `docs/features.md` maps each one and states exactly what is not yet verified on a
+device.

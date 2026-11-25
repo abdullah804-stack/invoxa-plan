@@ -582,3 +582,153 @@ export interface RestoreResult {
   };
   business: Business;
 }
+
+/** A payment-link QR, generated on the server from the link on the document. */
+export interface PaymentQr {
+  path: string;
+  size: number;
+}
+
+export interface DocumentDetail {
+  document: DocumentRecord;
+  qr: PaymentQr | null;
+}
+
+export interface ReceiptResult {
+  document: DocumentRecord;
+  paid: number;
+}
+
+export interface ReportRange {
+  from?: string;
+  to?: string;
+  currency?: string;
+}
+
+export interface AgingBucket {
+  key: string;
+  label: string;
+  amount: number;
+  count: number;
+}
+
+export interface AgingSection {
+  currency: string;
+  buckets: AgingBucket[];
+  total: number;
+  count: number;
+}
+
+export interface CashFlowMonth {
+  month: string;
+  invoiced: number;
+  collected: number;
+}
+
+export interface SlowPayer {
+  clientId: string | null;
+  clientName: string;
+  currency: string;
+  averageDays: number;
+  settled: number;
+}
+
+export interface CashFlowSection {
+  currency: string;
+  invoiced: number;
+  collected: number;
+  overdue: number;
+  expectedThisMonth: number;
+  averageDaysToPay: number | null;
+  months: CashFlowMonth[];
+  slowestPayers: SlowPayer[];
+}
+
+export interface CashFlowResponse {
+  today: string;
+  from: string;
+  to: string;
+  currencies: CashFlowSection[];
+}
+
+export interface AgingResponse {
+  today: string;
+  currencies: AgingSection[];
+}
+
+export interface ClientSalesRow {
+  clientId: string | null;
+  clientName: string;
+  currency: string;
+  invoices: number;
+  invoiced: number;
+  paid: number;
+  outstanding: number;
+}
+
+export interface SalesByClientResponse {
+  from: string | null;
+  to: string | null;
+  rows: ClientSalesRow[];
+  totals: { currency: string; invoiced: number; paid: number; outstanding: number }[];
+}
+
+export interface TaxPeriodRow {
+  period: string;
+  currency: string;
+  taxableBase: number;
+  tax: number;
+  documents: number;
+}
+
+export interface TaxSummaryResponse {
+  from: string | null;
+  to: string | null;
+  months: TaxPeriodRow[];
+  quarters: TaxPeriodRow[];
+}
+
+export interface StatementRow {
+  id: string;
+  date: string;
+  number: string;
+  dueDate: string | null;
+  total: number;
+  paid: number;
+  balance: number;
+}
+
+export interface StatementSection {
+  currency: string;
+  openingBalance: number;
+  closingBalance: number;
+  billed: number;
+  paid: number;
+  rows: StatementRow[];
+}
+
+export interface StatementResponse {
+  today: string;
+  from: string | null;
+  to: string | null;
+  client: Client;
+  sections: StatementSection[];
+}
+
+export type RefineTone = 'shorter' | 'friendlier' | 'formal' | 'clearer';
+
+export interface SyncDocument extends DocumentDraftBody {
+  clientUuid: string;
+  docType: 'invoice' | 'estimate' | 'credit_note';
+}
+
+export interface SyncResultRow {
+  status: 'created' | 'updated' | 'conflict' | 'failed';
+  clientUuid: string;
+  message?: string;
+  document?: DocumentRecord;
+}
+
+export interface SyncResponse {
+  results: SyncResultRow[];
+}

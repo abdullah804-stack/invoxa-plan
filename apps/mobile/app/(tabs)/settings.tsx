@@ -71,11 +71,71 @@ export default function SettingsScreen() {
   const [lateFeeValue, setLateFeeValue] = useState('');
   const [lateFeeGrace, setLateFeeGrace] = useState('0');
   const [lateFeeNotice, setLateFeeNotice] = useState<string | null>(null);
+  const [presetName, setPresetName] = useState('');
+  const [presetRate, setPresetRate] = useState('');
+  const [presetNotice, setPresetNotice] = useState<string | null>(null);
   const [appLock, setAppLock] = useState<AppLockSettings | null>(null);
   const [biometrics, setBiometrics] = useState<BiometricSupport | null>(null);
   const [lockNotice, setLockNotice] = useState<string | null>(null);
 
   const currency = business?.currency ?? 'USD';
+  const taxPresets = business?.taxPresets ?? [];
+
+  const savePresets = (
+    next: { name: string; rateBp: number; note?: string | null }[],
+    message: string,
+  ) => {
+    updateProfile.mutate(
+      { taxPresets: next },
+      {
+        onSuccess: () => setPresetNotice(message),
+        onError: (error) => setPresetNotice(errorMessage(error)),
+      },
+    );
+  };
+
+  const addTaxPreset = () => {
+    const name = presetName.trim();
+    const percent = Number(presetRate.trim().replace(',', '.'));
+    if (!name) {
+      setPresetNotice('Give the rate a name, such as VAT 20%.');
+      return;
+    }
+    if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
+      setPresetNotice('Enter a rate between 0 and 100.');
+      return;
+    }
+    if (taxPresets.some((preset) => preset.name.toLowerCase() === name.toLowerCase())) {
+      setPresetNotice('That name is already saved. Remove it first to change the rate.');
+      return;
+    }
+    savePresets(
+      [
+        ...taxPresets.map((preset) => ({
+          name: preset.name,
+          rateBp: preset.rateBp,
+          note: preset.note,
+        })),
+        {
+          name,
+          rateBp: Math.round(percent * 100),
+          note: 'Check your local rate.',
+        },
+      ],
+      'Preset saved. It appears in the invoice editor.',
+    );
+    setPresetName('');
+    setPresetRate('');
+  };
+
+  const removeTaxPreset = (name: string) => {
+    savePresets(
+      taxPresets
+        .filter((preset) => preset.name !== name)
+        .map((preset) => ({ name: preset.name, rateBp: preset.rateBp, note: preset.note })),
+      'Preset removed.',
+    );
+  };
 
   useEffect(() => {
     let active = true;
@@ -314,6 +374,68 @@ export default function SettingsScreen() {
             ) : null}
           </Card>
         </View>
+
+        {canManageReminders ? (
+          <View style={styles.section}>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Tax presets</Text>
+            <Card style={styles.card}>
+              <Text style={[styles.hint, { color: colors.textMuted }]}>
+                Save the rates you use so they become one-tap chips in the invoice editor. Invoxa
+                does not set tax rates for you: check your local tax authority.
+              </Text>
+              {taxPresets.length === 0 ? (
+                <Text style={[styles.hint, { color: colors.textMuted }]}>No presets yet.</Text>
+              ) : (
+                taxPresets.map((preset) => (
+                  <View key={preset.name} style={styles.row}>
+                    <View style={styles.rowText}>
+                      <Text style={[styles.rowTitle, { color: colors.text }]}>{preset.name}</Text>
+                      <Text style={[styles.rowSubtitle, { color: colors.textMuted }]}>
+                        {preset.rateBp / 100}%{preset.note ? ` · ${preset.note}` : ''}
+                      </Text>
+                    </View>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove ${preset.name}`}
+                      onPress={() => removeTaxPreset(preset.name)}
+                      hitSlop={8}
+                    >
+                      <Text style={[styles.editLabel, { color: colors.danger }]}>Remove</Text>
+                    </Pressable>
+                  </View>
+                ))
+              )}
+              <View style={styles.row}>
+                <View style={styles.rowText}>
+                  <TextField
+                    label="Name"
+                    value={presetName}
+                    onChangeText={setPresetName}
+                    placeholder="VAT 20%"
+                  />
+                </View>
+                <View style={styles.rowText}>
+                  <TextField
+                    label="Rate %"
+                    value={presetRate}
+                    onChangeText={setPresetRate}
+                    placeholder="20"
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+              </View>
+              <Button
+                title="Add preset"
+                variant="secondary"
+                onPress={addTaxPreset}
+                loading={updateProfile.isPending}
+              />
+              {presetNotice ? (
+                <Text style={[styles.hint, { color: colors.textMuted }]}>{presetNotice}</Text>
+              ) : null}
+            </Card>
+          </View>
+        ) : null}
 
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Team</Text>

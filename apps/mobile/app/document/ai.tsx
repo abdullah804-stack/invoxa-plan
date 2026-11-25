@@ -22,6 +22,7 @@ import { Segmented } from '../../src/components/Segmented';
 import { TextField } from '../../src/components/TextField';
 import { errorMessage } from '../../src/lib/errors';
 import { readSecure, StorageKeys, writeSecure } from '../../src/lib/storage';
+import { useVoiceInput } from '../../src/lib/useVoiceInput';
 import { radius, spacing, typeScale } from '../../src/theme/tokens';
 import { useTheme } from '../../src/theme/ThemeProvider';
 
@@ -64,6 +65,12 @@ export default function AiDraftScreen() {
 
   const canUseAi = activeRole ? can(activeRole, 'ai:use') : false;
   const busy = ai.isPending || createDocument.isPending;
+  // Speech becomes ordinary text in the field; the draft is only requested when
+  // the user presses Draft it, so talking never submits anything by itself.
+  const voice = useVoiceInput(
+    (text) => setPrompt((current) => (current.trim() ? `${current.trim()} ${text}` : text)),
+    'en',
+  );
 
   useEffect(() => {
     let active = true;
@@ -191,6 +198,33 @@ export default function AiDraftScreen() {
                 maxLength={1000}
               />
 
+              {voice.available ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={voice.listening ? 'Stop speaking' : 'Speak your draft'}
+                  onPress={() => (voice.listening ? voice.stop() : voice.start())}
+                  style={[
+                    styles.voiceRow,
+                    {
+                      backgroundColor: voice.listening ? colors.accentSoft : colors.surfaceMuted,
+                      borderColor: voice.listening ? colors.accent : colors.border,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name={voice.listening ? 'stop-circle-outline' : 'mic-outline'}
+                    size={20}
+                    color={colors.accent}
+                  />
+                  <Text style={[styles.voiceLabel, { color: colors.text }]}>
+                    {voice.listening ? 'Listening… tap to stop' : 'Or speak it'}
+                  </Text>
+                </Pressable>
+              ) : null}
+              {voice.error ? (
+                <Text style={[styles.footnote, { color: colors.danger }]}>{voice.error}</Text>
+              ) : null}
+
               <View style={styles.examples}>
                 {EXAMPLES.map((example) => (
                   <FilterChip
@@ -273,6 +307,19 @@ const styles = StyleSheet.create({
   },
   body: {
     ...typeScale.body,
+  },
+  voiceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    minHeight: 48,
+  },
+  voiceLabel: {
+    ...typeScale.bodyStrong,
   },
   examples: {
     flexDirection: 'row',

@@ -1,4 +1,4 @@
-import { apiRequest } from './client';
+import { apiRequest, apiText } from './client';
 import type {
   ActivityPage,
   AiDraftResponse,
@@ -39,6 +39,15 @@ import type {
   Summary,
   Timer,
   User,
+  AgingResponse,
+  CashFlowResponse,
+  DocumentDetail,
+  ReceiptResult,
+  ReportRange,
+  SalesByClientResponse,
+  StatementResponse,
+  SyncResponse,
+  TaxSummaryResponse,
 } from './types';
 
 export interface AuthResponse {
@@ -71,6 +80,12 @@ export interface ProfileUpdate {
     headerLayout?: 'logo-left' | 'logo-right' | 'centered';
   };
   reminders?: { enabled?: boolean; hour?: number; daysBefore?: number };
+  taxPresets?: {
+    name: string;
+    rateBp: number;
+    checkedOn?: string | null;
+    note?: string | null;
+  }[];
 }
 
 export function registerAccount(input: {
@@ -135,8 +150,8 @@ export function listDocuments(params: DocumentListParams): Promise<DocumentListR
   });
 }
 
-export function fetchDocument(id: string): Promise<{ document: DocumentRecord }> {
-  return apiRequest<{ document: DocumentRecord }>(`/invoices/${id}`);
+export function fetchDocument(id: string): Promise<DocumentDetail> {
+  return apiRequest<DocumentDetail>(`/invoices/${id}`);
 }
 
 export function createDocument(
@@ -539,4 +554,88 @@ export function restoreBackup(file: unknown): Promise<RestoreResult> {
 
 export function deleteAccount(password: string): Promise<null> {
   return apiRequest<null>('/auth/me', { method: 'DELETE', body: { password } });
+}
+
+export function fetchReceipt(id: string): Promise<ReceiptResult> {
+  return apiRequest<ReceiptResult>(`/invoices/${id}/receipt`);
+}
+
+export function refineText(input: {
+  text: string;
+  tone: 'shorter' | 'friendlier' | 'formal' | 'clearer';
+  language?: string;
+}): Promise<{ text: string; remaining: number }> {
+  return apiRequest<{ text: string; remaining: number }>('/ai/refine', {
+    method: 'POST',
+    body: input,
+    timeoutMs: 35_000,
+  });
+}
+
+function rangeQuery(range: ReportRange): Record<string, string | undefined> {
+  return { from: range.from, to: range.to, currency: range.currency };
+}
+
+export function fetchCashFlow(range: ReportRange): Promise<CashFlowResponse> {
+  return apiRequest<CashFlowResponse>('/reports/cash-flow', { query: rangeQuery(range) });
+}
+
+export function fetchAging(): Promise<AgingResponse> {
+  return apiRequest<AgingResponse>('/reports/aging');
+}
+
+export function fetchSalesByClient(range: ReportRange): Promise<SalesByClientResponse> {
+  return apiRequest<SalesByClientResponse>('/reports/by-client', { query: rangeQuery(range) });
+}
+
+export function fetchTaxSummary(range: ReportRange): Promise<TaxSummaryResponse> {
+  return apiRequest<TaxSummaryResponse>('/reports/tax', { query: rangeQuery(range) });
+}
+
+export function fetchStatement(
+  clientId: string,
+  range: ReportRange = {},
+): Promise<StatementResponse> {
+  return apiRequest<StatementResponse>(`/clients/${clientId}/statement`, {
+    query: rangeQuery(range),
+  });
+}
+
+export function fetchDocumentsCsv(
+  params: {
+    docType?: 'invoice' | 'estimate' | 'credit_note';
+    status?: 'draft' | 'sent' | 'paid' | 'void';
+    from?: string;
+    to?: string;
+    clientId?: string;
+    q?: string;
+  } = {},
+): Promise<string> {
+  return apiText('/reports/export/documents.csv', { query: params, timeoutMs: 40_000 });
+}
+
+export function fetchExpensesCsv(
+  params: {
+    from?: string;
+    to?: string;
+    category?: ExpenseCategory;
+  } = {},
+): Promise<string> {
+  return apiText('/reports/export/expenses.csv', { query: params, timeoutMs: 40_000 });
+}
+
+export function syncInvoices(
+  invoices: Array<{
+    baseUpdatedAt?: string | null;
+    document: DocumentDraftBody & {
+      clientUuid: string;
+      docType: 'invoice' | 'estimate' | 'credit_note';
+    };
+  }>,
+): Promise<SyncResponse> {
+  return apiRequest<SyncResponse>('/sync/invoices', {
+    method: 'POST',
+    body: { invoices },
+    timeoutMs: 40_000,
+  });
 }

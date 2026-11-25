@@ -97,7 +97,15 @@ export interface RequestOptions {
   timeoutMs?: number;
 }
 
-export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+interface RawResponse {
+  ok: boolean;
+  status: number;
+  headers: Headers;
+  text: string;
+}
+
+/** One place for headers, timeouts, the 401 hook and error shape. */
+async function sendRequest(path: string, options: RequestOptions = {}): Promise<RawResponse> {
   const { method = 'GET', body, query, timeoutMs = 25_000 } = options;
 
   const headers: Record<string, string> = {
@@ -112,6 +120,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   let response: Response;
+  let text: string;
   try {
     response = await fetch(`${API_URL}${withQuery(path, query)}`, {
       method,
@@ -119,6 +128,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
       signal: controller.signal,
     });
+    text = await response.text();
   } catch (error) {
     const aborted = error instanceof Error && error.name === 'AbortError';
     throw new ApiError(
@@ -136,17 +146,15 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     if (sessionToken) unauthorizedHandler?.();
   }
 
-  const text = await response.text();
-  let payload: unknown = null;
-  if (text) {
-    try {
-      payload = JSON.parse(text);
-    } catch {
-      payload = null;
-    }
-  }
-
   if (!response.ok) {
+    let payload: unknown = null;
+    if (text) {
+      try {
+        payload = JSON.parse(text);
+      } catch {
+        payload = null;
+      }
+    }
     const parsed = payload as ApiErrorBody | null;
     const retryAfter = Number.parseInt(response.headers.get('retry-after') ?? '', 10);
     throw new ApiError(
@@ -158,5 +166,21 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     );
   }
 
-  return payload as T;
+  return { ok: true, status: response.status, headers: response.headers, text };
+}
+
+export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const { text } = await sendRequest(path, options);
+  if (!text) return null as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null as T;
+  }
+}
+
+/** CSV downloads are already text: parsing them as JSON would lose them. */
+export async function apiText(path: string, options: RequestOptions = {}): Promise<string> {
+  const { text } = await sendRequest(path, options);
+  return text;
 }

@@ -208,6 +208,11 @@ export default function ClientDetailScreen() {
 
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>Documents</Text>
+              <Button
+                title="Client statement"
+                variant="secondary"
+                onPress={() => router.push(`/client/statement?id=${client.id}`)}
+              />
               {documents.length === 0 ? (
                 <Card>
                   <Text style={[styles.muted, { color: colors.textMuted }]}>

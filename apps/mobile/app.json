@@ -33,6 +33,13 @@
       [
         "expo-local-authentication",
         { "faceIDPermission": "Invoxa uses Face ID to unlock the app on this phone." }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Invoxa uses the microphone only while you speak a draft.",
+          "speechRecognitionPermission": "Invoxa turns your spoken sentence into a draft you can edit."
+        }
       ]
     ],
     "experiments": {

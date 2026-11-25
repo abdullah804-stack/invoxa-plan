@@ -116,6 +116,22 @@ export default function DashboardScreen() {
           </View>
         </View>
 
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open reports"
+          onPress={() => router.push('/reports')}
+        >
+          <Card style={styles.reminderCard}>
+            <View style={styles.reminderTop}>
+              <Ionicons name="stats-chart-outline" size={18} color={colors.accent} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Reports</Text>
+            </View>
+            <Text style={[styles.reminderText, { color: colors.textMuted }]}>
+              Cash flow, aging, sales by client, tax and CSV exports.
+            </Text>
+          </Card>
+        </Pressable>
+
         {reminders.data && reminders.data.counts.overdue + reminders.data.counts.dueSoon > 0 ? (
           <Pressable
             accessibilityRole="button"

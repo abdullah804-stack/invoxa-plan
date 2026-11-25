@@ -1,0 +1,39 @@
+# The twelve features added after week 16
+
+The week 7, 8, 10 and 11 task lists were only partly covered by their milestone commits. This page
+closes that gap: it lists each missing feature, where it now lives, and how far it has been
+verified. Nothing here is a plan for later — it is all in the repository.
+
+| Feature | Where it lives | Verification |
+| --- | --- | --- |
+| **Receipt PDF** | `GET /invoices/:id/receipt` (409 until something is paid); `renderReceiptHtml` in `packages/shared/src/receipt.ts`; `app/document/receipt.tsx` | API test covers 409 and a paid receipt; renderer tested through the statement/PDF build; **not viewed on a device** |
+| **Client statement PDF** | `GET /clients/:id/statement`; `buildStatement` and `renderStatementHtml` in `packages/shared/src/statement.ts`; `app/client/statement.tsx` | Opening balance, billed and closing balance tested in shared and API tests; **not viewed on a device** |
+| **CSV export** | `GET /reports/export/documents.csv` and `/reports/export/expenses.csv`; `toCsv`/`documentsCsv`/`expensesCsv` in `packages/shared/src/csv.ts`; Export card in `app/reports/index.tsx` | BOM, comma quoting, formula-injection prefix and plain decimals tested; API test checks the real response; **not opened in Excel/Sheets on a device** |
+| **Cash-flow report** | `GET /reports/cash-flow`; `cashFlowReport` in `packages/shared/src/reports.ts`; Reports screen | Invoiced/collected per month, overdue, due this month, average days and slowest payers tested by hand vectors and an API test |
+| **Aging report** | `GET /reports/aging`; `agingReport` | Buckets current, 1–30, 31–60, 61–90 and 90+ tested per currency |
+| **Sales by client** | `GET /reports/by-client`; `salesByClient` | Grouping, sorting and totals tested |
+| **Tax summary** | `GET /reports/tax`; `taxSummary` | Monthly and quarterly rows, taxable base before tax, void excluded, tested |
+| **Tax presets UI** | Settings → Tax presets; chips appear next to the tax rate in the editor; the existing `taxPresets` API field now has a screen | Typechecked and bundled; saving calls the same `PUT /profile` covered by existing profile tests. **Not exercised on a device** |
+| **QR code for the payment link** | `services/qr.ts` generates a path on the server from the stored https link; `renderer.ts` accepts only path data; the invoice preview shows it | API test asserts a real QR path and size; the renderer path is character-validated so it cannot carry markup |
+| **Refine with AI** | `POST /ai/refine` (5/min, shared daily cap, one retry, refund on failure); `requestAiRefine`; Refine chips under Notes in the editor | API test with a stubbed Gemini: success, refunded failure, remaining count. **Live-model quality is unverified** (no `GEMINI_API_KEY`) |
+| **Reminder message sheet** | “Send reminder” on a sent invoice with a balance; `buildReminderMessage`, `whatsappShareUrl`, `mailtoUrl` in `packages/shared/src/reminderMessage.ts` | English/Spanish/French text, amount, due date and link encoding tested; the sheet opens WhatsApp/email through the OS |
+| **Offline drafts and sync** | `POST /sync/invoices` (per-item created/updated/conflict/failed, conflict on a stale `baseUpdatedAt`); queue in `src/lib/offline.ts`; banner in the invoice list; cached dashboard and list | API test covers create, retry without duplication, conflict and a mixed batch. The device queue is typechecked and bundled; **airplane-mode behaviour was not run on a phone** |
+| **Voice invoice drafting** | `useVoiceInput` over `expo-speech-recognition`; mic on the Describe-it screen; text is editable and never auto-submitted; mic hidden in Expo Go | Web and Android bundles build. **Speech recognition itself needs a development build and a real phone**, so it is unverified here |
+
+## Deliberate deviations from the roadmap text
+
+- **Offline storage is a JSON queue, not SQLite.** The queue holds a few drafts, each already keyed by
+  `clientUuid`; a file (localStorage on web) gives the same guarantee without a second native module
+  and works on all three targets. The read-only cache uses the same store.
+- **The QR is generated on the server.** That keeps the mobile bundle free of a QR library and means
+  the QR always matches the link actually printed on the document. Only validated path data reaches
+  the renderer.
+- **The reminder sheet does not send anything.** It opens WhatsApp, email or the system share sheet,
+  which is what the free-tier constraint allows and what the roadmap asked for.
+
+## What still needs a phone or an account
+
+Every item above that touches native UI (PDFs, share sheet, WhatsApp/email hand-off, speech, airplane
+mode) is covered by shared/API tests and by both bundle builds, but not by a real device. The phone
+checklist in `docs/phone-checklist.md` lists the exact taps. Gemini, Atlas, Render, Netlify, Expo and
+the stores still need accounts and keys; see `docs/release.md`.

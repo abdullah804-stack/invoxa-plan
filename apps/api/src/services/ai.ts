@@ -1,5 +1,6 @@
 import {
   aiDraftSuggestionSchema,
+  aiRefineResultSchema,
   EXPENSE_CATEGORY_LABELS,
   majorToMinor,
   percentToBasisPoints,
@@ -25,6 +26,14 @@ import { AppError } from '../errors.js';
 const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
 const TIMEOUT_MS = 20_000;
 const MAX_ITEMS = 20;
+
+const REFINE_SCHEMA = {
+  type: 'OBJECT',
+  properties: { text: { type: 'STRING' } },
+  required: ['text'],
+} as const;
+
+export type RefineTone = 'shorter' | 'friendlier' | 'formal' | 'clearer';
 
 const RESPONSE_SCHEMA = {
   type: 'OBJECT',
@@ -356,6 +365,97 @@ function parseJsonObject(reply: string): Record<string, unknown> | null {
   } catch {
     return null;
   }
+}
+
+interface RefineRequest {
+  apiKey: string;
+  model: string;
+  text: string;
+  tone: RefineTone;
+  language: string;
+}
+
+const TONE_RULES: Record<RefineTone, string> = {
+  shorter: 'Make it noticeably shorter while keeping every fact.',
+  friendlier: 'Make it warmer and more polite, still professional.',
+  formal: 'Make it formal and businesslike.',
+  clearer: 'Make it clearer and easier to read, without adding detail.',
+};
+
+/**
+ * Refine rewrites one piece of text the user wrote (line descriptions or notes).
+ * It never changes a price, a quantity, a date or a total: those never leave the
+ * app as text. Personal data is redacted first, like every other AI call.
+ */
+export async function requestAiRefine(input: RefineRequest): Promise<{ text: string }> {
+  const instruction = [
+    'You improve one short piece of text on an invoice written by a small business owner.',
+    'Reply with JSON only: {"text": "..."}. Never write prose outside the JSON.',
+    `Write in ${input.language}. Keep every fact, name, amount and date exactly as written.`,
+    'Do not add new facts, promises, discounts or payment terms.',
+    TONE_RULES[input.tone],
+    `Text: ${redactPersonalData(input.text)}`,
+  ].join('\n');
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    let response: Response;
+    try {
+      response = await fetch(`${ENDPOINT}/${encodeURIComponent(input.model)}:generateContent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': input.apiKey,
+        },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: instruction }] },
+          contents: [{ role: 'user', parts: [{ text: 'Rewrite this text.' }] }],
+          generationConfig: {
+            temperature: 0.4,
+            maxOutputTokens: 800,
+            responseMimeType: 'application/json',
+            responseSchema: REFINE_SCHEMA,
+          },
+        }),
+        signal: controller.signal,
+      });
+    } catch {
+      clearTimeout(timer);
+      throw new AppError(
+        'AI_FAILED',
+        controller.signal.aborted
+          ? 'The assistant took too long. Try again.'
+          : 'The assistant could not be reached. Try again.',
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (!response.ok) {
+      throw new AppError(
+        'AI_FAILED',
+        response.status === 429
+          ? 'The assistant is busy right now. Try again in a minute.'
+          : 'That text could not be improved. Try again.',
+      );
+    }
+
+    let reply: unknown = null;
+    try {
+      reply = await response.json();
+    } catch {
+      reply = null;
+    }
+
+    const text = extractText(reply);
+    const raw = text ? parseJsonObject(text) : null;
+    const parsed = raw ? aiRefineResultSchema.safeParse({ text: raw['text'] }) : null;
+    // The plan asks for exactly one retry, so a garbled reply gets one more try.
+    if (parsed?.success) return parsed.data;
+  }
+
+  throw new AppError('AI_FAILED', 'The assistant reply could not be read. Try again.');
 }
 
 export async function requestAiDraft(input: DraftRequest): Promise<AiDraftSuggestion> {

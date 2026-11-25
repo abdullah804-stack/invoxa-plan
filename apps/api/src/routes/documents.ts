@@ -40,6 +40,7 @@ import {
 } from '../services/documents.js';
 import { Project, TimeEntry } from '../models/project.js';
 import { assignDocumentNumber } from '../services/numbering.js';
+import { paymentQr } from '../services/qr.js';
 import { logActivity } from '../services/activity.js';
 import { requireAction, resolveTenant, type TenantContext } from '../tenant.js';
 import { parseOrThrow } from '../validation.js';
@@ -399,7 +400,28 @@ export const documentRoutes: FastifyPluginAsync<DocumentRouteOptions> = async (a
     requireAction(context, 'documents:read');
 
     const doc = await loadDocument(context, paramId(request));
-    return { document: serializeDocument(doc, requestToday(request)) };
+    // Issued documents keep the payment link they were issued with; a draft
+    // follows the business's current link. The QR is generated from that same
+    // link, never supplied by the client.
+    const business = await Business.findById(context.businessId);
+    const link = doc.brandSnapshot?.paymentLink ?? business?.payment?.link ?? null;
+    return {
+      document: serializeDocument(doc, requestToday(request)),
+      qr: paymentQr(link),
+    };
+  });
+
+  /** A receipt exists only once something was paid; it returns the same document. */
+  app.get('/invoices/:id/receipt', { preHandler: authenticateRequest }, async (request) => {
+    const context = await resolveTenant(request);
+    requireAction(context, 'documents:read');
+
+    const doc = await loadDocument(context, paramId(request));
+    const totals = totalsFor(doc);
+    if (totals.paid <= 0) {
+      throw errors.conflict('A receipt needs at least one payment');
+    }
+    return { document: serializeDocument(doc, requestToday(request)), paid: totals.paid };
   });
 
   /** POST is idempotent on clientUuid, so a retried sync never duplicates. */

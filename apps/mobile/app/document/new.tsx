@@ -11,6 +11,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -27,6 +28,7 @@ import {
   useExpenses,
   useProfile,
   useProject,
+  useRefineText,
   useSavedItems,
   useUpdateDocument,
 } from '../../src/api/hooks';
@@ -34,6 +36,7 @@ import { useSession } from '../../src/auth/SessionProvider';
 import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
 import { ClientPicker } from '../../src/components/ClientPicker';
+import { FilterChip } from '../../src/components/FilterChip';
 import { ProjectPicker } from '../../src/components/ProjectPicker';
 import { Screen } from '../../src/components/Screen';
 import { Segmented } from '../../src/components/Segmented';
@@ -42,6 +45,7 @@ import { Skeleton } from '../../src/components/Skeleton';
 import { TextField } from '../../src/components/TextField';
 import { TotalsBlock } from '../../src/components/TotalsBlock';
 import { errorMessage } from '../../src/lib/errors';
+import { enqueueDraft, isOfflineError } from '../../src/lib/offline';
 import { formatMinutes } from '../../src/lib/time';
 import {
   amountToInput,
@@ -85,6 +89,13 @@ const TAX_OPTIONS: { value: TaxMode; label: string }[] = [
   { value: 'included', label: 'Included' },
 ];
 
+const REFINE_TONES = [
+  { value: 'clearer' as const, label: 'Clearer' },
+  { value: 'shorter' as const, label: 'Shorter' },
+  { value: 'friendlier' as const, label: 'Friendlier' },
+  { value: 'formal' as const, label: 'Formal' },
+];
+
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 function isDocType(value: unknown): value is DocType {
@@ -115,7 +126,7 @@ function newClientUuid(): string {
 export default function DocumentEditorScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const { activeRole } = useSession();
+  const { activeRole, activeBusinessId } = useSession();
   const params = useLocalSearchParams<{
     id?: string;
     docType?: string;
@@ -130,6 +141,7 @@ export default function DocumentEditorScreen() {
   const createDocument = useCreateDocument();
   const updateDocument = useUpdateDocument();
   const saveSavedItem = useCreateSavedItem();
+  const refine = useRefineText();
 
   const [docType, setDocType] = useState<DocType>(
     isDocType(params.docType) ? params.docType : 'invoice',
@@ -158,6 +170,7 @@ export default function DocumentEditorScreen() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [refineNotice, setRefineNotice] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [savedOpen, setSavedOpen] = useState(false);
   const [projectOpen, setProjectOpen] = useState(false);
@@ -399,17 +412,59 @@ export default function DocumentEditorScreen() {
     };
   };
 
+  /**
+   * Refine rewrites only the notes text. Amounts, dates and totals never leave
+   * the app as prompt text, so the assistant cannot change them.
+   */
+  const refineNotes = async (tone: 'shorter' | 'friendlier' | 'formal' | 'clearer') => {
+    const text = notes.trim();
+    if (!text) {
+      setRefineNotice('Write a note first, then refine it.');
+      return;
+    }
+    setRefineNotice(null);
+    try {
+      const result = await refine.mutateAsync({
+        text,
+        tone,
+        ...(profile.data?.business.language ? { language: profile.data.business.language } : {}),
+      });
+      setNotes(result.text);
+      setRefineNotice(`Rewritten (${tone}). You can edit it again.`);
+    } catch (error) {
+      setRefineNotice(errorMessage(error));
+    }
+  };
+
   const save = async () => {
     setFormError(null);
     setNotice(null);
     const body = buildPayload();
     if (!body) return;
+    const clientUuid = newClientUuid();
     try {
       const result = editingId
         ? await updateDocument.mutateAsync({ id: editingId, input: body })
-        : await createDocument.mutateAsync({ ...body, clientUuid: newClientUuid(), docType });
+        : await createDocument.mutateAsync({ ...body, clientUuid, docType });
       router.replace(`/document/${result.document.id}`);
     } catch (error) {
+      // No signal: keep the draft on the phone with its device ID, so syncing
+      // later cannot duplicate it and an edit never overwrites a newer server copy.
+      if (activeBusinessId && isOfflineError(error)) {
+        await enqueueDraft(activeBusinessId, {
+          clientUuid,
+          docType,
+          baseUpdatedAt: editingId ? (existing.data?.document.updatedAt ?? null) : null,
+          payload: body,
+          queuedAt: new Date().toISOString(),
+        });
+        Alert.alert(
+          'Saved on this phone',
+          'You are offline. This draft will sync when the connection is back.',
+          [{ text: 'OK', onPress: () => router.back() }],
+        );
+        return;
+      }
       setFormError(errorMessage(error));
     }
   };
@@ -765,6 +820,23 @@ export default function DocumentEditorScreen() {
                       : 'Tax is added on top of the discounted subtotal.'
                   }
                 />
+                {(profile.data?.business.taxPresets.length ?? 0) > 0 ? (
+                  <View style={styles.presetRow}>
+                    {profile.data?.business.taxPresets.map((preset) => (
+                      <FilterChip
+                        key={`${preset.name}-${preset.rateBp}`}
+                        label={`${preset.name} · ${preset.rateBp / 100}%`}
+                        selected={taxRateBp === preset.rateBp}
+                        onPress={() => setTaxRate(String(preset.rateBp / 100))}
+                      />
+                    ))}
+                  </View>
+                ) : null}
+                {profile.data?.business.taxPresets.some((preset) => preset.note) ? (
+                  <Text style={[styles.footerHint, { color: colors.textMuted }]}>
+                    {profile.data?.business.taxPresets.find((preset) => preset.note)?.note}
+                  </Text>
+                ) : null}
               </Card>
 
               <Card style={styles.summaryCard}>
@@ -793,6 +865,28 @@ export default function DocumentEditorScreen() {
                   placeholder="A note for your client"
                   multiline
                 />
+                <View style={styles.refineRow}>
+                  <Text style={[styles.refineLabel, { color: colors.textMuted }]}>
+                    Refine notes with AI
+                  </Text>
+                  <View style={styles.refineChips}>
+                    {REFINE_TONES.map((tone) => (
+                      <FilterChip
+                        key={tone.value}
+                        label={tone.label}
+                        selected={false}
+                        onPress={() => void refineNotes(tone.value)}
+                      />
+                    ))}
+                  </View>
+                  {refine.isPending ? (
+                    <Text style={[styles.footerHint, { color: colors.textMuted }]}>Rewriting…</Text>
+                  ) : refineNotice ? (
+                    <Text style={[styles.footerHint, { color: colors.textMuted }]}>
+                      {refineNotice}
+                    </Text>
+                  ) : null}
+                </View>
                 <TextField
                   label="Terms"
                   value={terms}
@@ -938,6 +1032,24 @@ export default function DocumentEditorScreen() {
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
+  },
+  refineRow: {
+    gap: spacing.xs,
+  },
+  refineLabel: {
+    ...typeScale.small,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  refineChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  presetRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
   },
   content: {
     padding: spacing.xl,

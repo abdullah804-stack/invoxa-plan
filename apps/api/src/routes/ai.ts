@@ -1,12 +1,16 @@
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { Types } from 'mongoose';
-import { aiDraftRequestSchema, receiptScanRequestSchema } from '@invoxa/shared';
+import {
+  aiDraftRequestSchema,
+  aiRefineRequestSchema,
+  receiptScanRequestSchema,
+} from '@invoxa/shared';
 import type { ApiConfig } from '../config.js';
 import { authenticate } from '../auth/authenticate.js';
 import { AppError, errors } from '../errors.js';
 import { AiUsage } from '../models/aiUsage.js';
 import { Business } from '../models/business.js';
-import { requestAiDraft, requestReceiptScan } from '../services/ai.js';
+import { requestAiDraft, requestAiRefine, requestReceiptScan } from '../services/ai.js';
 import { requestToday } from '../services/documents.js';
 import { requireAction, resolveTenant } from '../tenant.js';
 import { parseOrThrow } from '../validation.js';
@@ -146,6 +150,52 @@ export const aiRoutes: FastifyPluginAsync<AiRouteOptions> = async (app, { config
       }
 
       return { receipt, remaining: Math.max(0, config.aiDailyLimit - used) };
+    },
+  );
+
+  /**
+   * Refine one piece of text the user wrote. It returns text only and never
+   * writes a document: prices, quantities, dates and totals never leave the app
+   * as prompt text, so the assistant cannot change them.
+   */
+  app.post(
+    '/ai/refine',
+    {
+      preHandler: authenticateRequest,
+      config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
+    },
+    async (request) => {
+      const context = await resolveTenant(request);
+      requireAction(context, 'ai:use');
+
+      const input = parseOrThrow(aiRefineRequestSchema, request.body ?? {});
+
+      if (!config.geminiApiKey) {
+        throw new AppError('AI_FAILED', 'AI editing is not set up on this server yet.');
+      }
+
+      const business = await Business.findById(context.businessId);
+      if (!business) {
+        throw errors.notFound();
+      }
+
+      const { used, refund } = await takeAiUse(request, config, context.businessId, context.userId);
+
+      let refined;
+      try {
+        refined = await requestAiRefine({
+          apiKey: config.geminiApiKey,
+          model: config.geminiModel,
+          text: input.text,
+          tone: input.tone,
+          language: input.language ?? business.language ?? 'en',
+        });
+      } catch (error) {
+        await refund();
+        throw error;
+      }
+
+      return { text: refined.text, remaining: Math.max(0, config.aiDailyLimit - used) };
     },
   );
 };

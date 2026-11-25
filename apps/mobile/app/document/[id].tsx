@@ -1,11 +1,15 @@
 import {
+  buildReminderMessage,
   can,
   canTransition,
   computeTotals,
+  daysBetween,
   DOCUMENT_TITLES,
   formatDate,
   formatMoney,
   lateFeeAmount,
+  mailtoUrl,
+  whatsappShareUrl,
   type StoredDocumentStatus,
 } from '@invoxa/shared';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,10 +18,12 @@ import { useMemo, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   RefreshControl,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -80,6 +86,9 @@ export default function DocumentDetailScreen() {
 
   const [notice, setNotice] = useState<string | null>(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [reminderOpen, setReminderOpen] = useState(false);
+  const [reminderText, setReminderText] = useState('');
+  const [reminderSubject, setReminderSubject] = useState('');
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState<PaymentMethod>('bank_transfer');
   const [reference, setReference] = useState('');
@@ -250,6 +259,32 @@ export default function DocumentDetailScreen() {
 
   const canShow = (from: StoredDocumentStatus | undefined, to: 'sent' | 'paid' | 'void') =>
     from ? canTransition(from, to) : false;
+
+  /** The reminder is text the user can edit; Invoxa never sends it itself. */
+  const openReminder = () => {
+    if (!document) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const message = buildReminderMessage({
+      clientName: document.clientSnapshot?.name ?? document.clientName,
+      businessName: profile.data?.business.name ?? 'Your business',
+      number: document.number,
+      amount: document.totals.balance,
+      currency: document.currency,
+      dueDate: document.dueDate,
+      daysUntilDue: document.dueDate ? daysBetween(today, document.dueDate) : 0,
+      language: profile.data?.business.language,
+    });
+    setReminderSubject(message.subject);
+    setReminderText(message.body);
+    setReminderOpen(true);
+  };
+
+  const shareReminder = () => {
+    void Share.share({
+      message: reminderText,
+      ...(reminderSubject ? { title: reminderSubject } : {}),
+    });
+  };
 
   const subtotalLine = (index: number) => {
     const line = lineNets[index];
@@ -538,6 +573,20 @@ export default function DocumentDetailScreen() {
                 onPress={() => router.push(`/document/preview?id=${document.id}`)}
               />
 
+              {document.docType === 'invoice' &&
+              document.status !== 'draft' &&
+              document.totals.balance > 0 ? (
+                <Button title="Send reminder" variant="secondary" onPress={openReminder} />
+              ) : null}
+
+              {document.totals.paid > 0 ? (
+                <Button
+                  title="View receipt"
+                  variant="secondary"
+                  onPress={() => router.push(`/document/receipt?id=${document.id}`)}
+                />
+              ) : null}
+
               {canDuplicate ? (
                 <Button
                   title="Duplicate"
@@ -573,6 +622,39 @@ export default function DocumentDetailScreen() {
           </>
         )}
       </ScrollView>
+
+      <Sheet visible={reminderOpen} title="Send reminder" onClose={() => setReminderOpen(false)}>
+        <Text style={[styles.body, { color: colors.textMuted }]}>
+          Edit the message, then send it with WhatsApp or email. Invoxa does not send it for you.
+        </Text>
+        <TextField label="Subject" value={reminderSubject} onChangeText={setReminderSubject} />
+        <TextField label="Message" value={reminderText} onChangeText={setReminderText} multiline />
+        <Button
+          title="Send with WhatsApp"
+          onPress={() =>
+            void Linking.openURL(
+              whatsappShareUrl(document?.clientSnapshot?.phone ?? null, reminderText),
+            )
+          }
+          disabled={!document?.clientSnapshot?.phone}
+        />
+        <Button
+          title="Send by email"
+          variant="secondary"
+          onPress={() =>
+            void Linking.openURL(
+              mailtoUrl(document?.clientSnapshot?.email ?? null, reminderSubject, reminderText),
+            )
+          }
+          disabled={!document?.clientSnapshot?.email}
+        />
+        <Button title="Share message" variant="secondary" onPress={shareReminder} />
+        {!document?.clientSnapshot?.phone ? (
+          <Text style={[styles.footerHint, { color: colors.textMuted }]}>
+            Add a phone number to this client to open WhatsApp directly.
+          </Text>
+        ) : null}
+      </Sheet>
 
       <Sheet visible={paymentOpen} title="Record payment" onClose={() => setPaymentOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>

@@ -1,5 +1,5 @@
 import { addDays, renderInvoiceHtml, type InvoiceTemplate } from '@invoxa/shared';
-import type { DocumentRecord, Profile } from '../api/types';
+import type { DocumentRecord, PaymentQr, Profile } from '../api/types';
 
 /**
  * Turns a stored document into the shared renderer's input. An issued document
@@ -21,6 +21,7 @@ export function buildInvoiceHtml(
   document: DocumentRecord,
   profile: Profile | undefined,
   assets: InvoiceAssets = {},
+  qr?: PaymentQr | null,
 ): string {
   const snapshot = document.brandSnapshot;
   const business = profile?.business;
@@ -82,6 +83,7 @@ export function buildInvoiceHtml(
       signatureDataUrl: assets.signatureDataUrl ?? null,
       paymentInstructions: snapshot?.paymentInstructions ?? business?.payment?.instructions ?? null,
       paymentLink: snapshot?.paymentLink ?? business?.payment?.link ?? null,
+      paymentQr: qr ?? null,
     },
   });
 }

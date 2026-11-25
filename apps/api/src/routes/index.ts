@@ -16,6 +16,7 @@ import { reminderRoutes } from './reminders.js';
 import { projectRoutes } from './projects.js';
 import { reportRoutes } from './reports.js';
 import { savedItemRoutes } from './savedItems.js';
+import { syncRoutes } from './sync.js';
 
 export async function registerRoutes(app: FastifyInstance, config: ApiConfig): Promise<void> {
   await app.register(
@@ -35,6 +36,7 @@ export async function registerRoutes(app: FastifyInstance, config: ApiConfig): P
       await api.register(reminderRoutes, { config });
       await api.register(expenseRoutes, { config });
       await api.register(projectRoutes, { config });
+      await api.register(syncRoutes, { config });
     },
     { prefix: API_BASE_PATH },
   );

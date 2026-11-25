@@ -61,8 +61,15 @@ export default function DocumentPreviewScreen() {
 
   const html = useMemo(
     () =>
-      document ? buildInvoiceHtml(document, profile.data, { logoDataUrl, signatureDataUrl }) : '',
-    [document, profile.data, logoDataUrl, signatureDataUrl],
+      document
+        ? buildInvoiceHtml(
+            document,
+            profile.data,
+            { logoDataUrl, signatureDataUrl },
+            documentQuery.data?.qr ?? null,
+          )
+        : '',
+    [document, profile.data, logoDataUrl, signatureDataUrl, documentQuery.data?.qr],
   );
 
   const share = async () => {

@@ -1,6 +1,7 @@
 import { retryAsync, splitBackupForUpload } from '@invoxa/shared';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from '../auth/SessionProvider';
+import { cacheRead, cacheWrite, isOfflineError, readQueue, removeQueued } from '../lib/offline';
 import { ApiError } from './client';
 import {
   acceptInvite,
@@ -25,7 +26,17 @@ import {
   discardTimer,
   draftWithAi,
   duplicateDocument,
+  fetchAging,
   fetchBackup,
+  fetchCashFlow,
+  fetchDocumentsCsv,
+  fetchExpensesCsv,
+  fetchReceipt,
+  fetchSalesByClient,
+  fetchStatement,
+  fetchTaxSummary,
+  refineText,
+  syncInvoices,
   fetchTeam,
   fetchExpenseReport,
   fetchReminders,
@@ -76,7 +87,9 @@ import type {
   ClientListParams,
   DocumentDraftBody,
   DocumentListParams,
+  DocumentListResponse,
   DocumentRecord,
+  ReportRange,
   ExpenseCategory,
   ExpenseInput,
   PaymentInput,
@@ -86,6 +99,7 @@ import type {
   ProjectStatus,
   ReceiptScanResult,
   RecurringSchedule,
+  Summary,
   TimeEntryInput,
 } from './types';
 
@@ -644,7 +658,20 @@ export function useSummary() {
   const { status, activeBusinessId } = useSession();
   return useQuery({
     queryKey: queryKeys.summary(activeBusinessId),
-    queryFn: fetchSummary,
+    queryFn: async () => {
+      try {
+        const summary = await fetchSummary();
+        if (activeBusinessId) await cacheWrite(activeBusinessId, 'summary', summary);
+        return summary;
+      } catch (error) {
+        // With no signal the last dashboard stays readable, clearly stale.
+        if (activeBusinessId && isOfflineError(error)) {
+          const cached = await cacheRead<Summary>(activeBusinessId, 'summary');
+          if (cached) return cached;
+        }
+        throw error;
+      }
+    },
     enabled: status === 'signedIn' && Boolean(activeBusinessId),
   });
 }
@@ -654,7 +681,20 @@ export function useDocumentPages(params: Omit<DocumentListParams, 'cursor'>) {
   const { status, activeBusinessId } = useSession();
   return useInfiniteQuery({
     queryKey: queryKeys.documents(activeBusinessId, params),
-    queryFn: ({ pageParam }) => listDocuments({ ...params, cursor: pageParam }),
+    queryFn: async ({ pageParam }) => {
+      const key = `documents-${JSON.stringify(params)}`;
+      try {
+        const page = await listDocuments({ ...params, cursor: pageParam });
+        if (activeBusinessId && !pageParam) await cacheWrite(activeBusinessId, key, page);
+        return page;
+      } catch (error) {
+        if (activeBusinessId && !pageParam && isOfflineError(error)) {
+          const cached = await cacheRead<DocumentListResponse>(activeBusinessId, key);
+          if (cached) return cached;
+        }
+        throw error;
+      }
+    },
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: status === 'signedIn' && Boolean(activeBusinessId),
@@ -882,6 +922,122 @@ export function useDuplicateDocument() {
   return useMutation({
     mutationFn: (id: string) => duplicateDocument(id),
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['documents', activeBusinessId] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.summary(activeBusinessId) });
+    },
+  });
+}
+
+export function useCashFlow(range: ReportRange) {
+  const { status, activeBusinessId } = useSession();
+  return useQuery({
+    queryKey: ['cash-flow', activeBusinessId, range],
+    queryFn: () => fetchCashFlow(range),
+    enabled: status === 'signedIn' && Boolean(activeBusinessId),
+  });
+}
+
+export function useAging() {
+  const { status, activeBusinessId } = useSession();
+  return useQuery({
+    queryKey: ['aging', activeBusinessId],
+    queryFn: fetchAging,
+    enabled: status === 'signedIn' && Boolean(activeBusinessId),
+  });
+}
+
+export function useSalesByClient(range: ReportRange) {
+  const { status, activeBusinessId } = useSession();
+  return useQuery({
+    queryKey: ['sales-by-client', activeBusinessId, range],
+    queryFn: () => fetchSalesByClient(range),
+    enabled: status === 'signedIn' && Boolean(activeBusinessId),
+  });
+}
+
+export function useTaxSummary(range: ReportRange) {
+  const { status, activeBusinessId } = useSession();
+  return useQuery({
+    queryKey: ['tax-summary', activeBusinessId, range],
+    queryFn: () => fetchTaxSummary(range),
+    enabled: status === 'signedIn' && Boolean(activeBusinessId),
+  });
+}
+
+export function useStatement(clientId: string | undefined, range: ReportRange = {}) {
+  const { status, activeBusinessId } = useSession();
+  return useQuery({
+    queryKey: ['statement', activeBusinessId, clientId ?? '', range],
+    queryFn: () => fetchStatement(clientId as string, range),
+    enabled: status === 'signedIn' && Boolean(activeBusinessId) && Boolean(clientId),
+  });
+}
+
+export function useReceipt(id: string | undefined) {
+  const { status, activeBusinessId } = useSession();
+  return useQuery({
+    queryKey: ['receipt', activeBusinessId, id ?? ''],
+    queryFn: () => fetchReceipt(id as string),
+    enabled: status === 'signedIn' && Boolean(activeBusinessId) && Boolean(id),
+  });
+}
+
+export function useRefineText() {
+  return useMutation({
+    mutationFn: (input: {
+      text: string;
+      tone: 'shorter' | 'friendlier' | 'formal' | 'clearer';
+      language?: string;
+    }) => refineText(input),
+  });
+}
+
+/** Export helpers, kept here so screens share the same request paths. */
+export const exportFunctions = { fetchDocumentsCsv, fetchExpensesCsv };
+
+/** The drafts written on this phone that the server has not seen yet. */
+export function useOfflineDrafts() {
+  const { status, activeBusinessId } = useSession();
+  return useQuery({
+    queryKey: ['offline-drafts', activeBusinessId],
+    queryFn: () => readQueue(activeBusinessId as string),
+    enabled: status === 'signedIn' && Boolean(activeBusinessId),
+    staleTime: 0,
+  });
+}
+
+/** Sends the queue once; created and updated items leave it, conflicts stay. */
+export function useSyncOfflineDrafts() {
+  const queryClient = useQueryClient();
+  const { activeBusinessId } = useSession();
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!activeBusinessId) throw new Error('Choose a business first');
+      const queue = await readQueue(activeBusinessId);
+      if (queue.length === 0) return { sent: 0, synced: 0, conflicts: 0, remaining: 0 };
+
+      const response = await syncInvoices(
+        queue.map((item) => ({
+          baseUpdatedAt: item.baseUpdatedAt,
+          document: { ...item.payload, clientUuid: item.clientUuid, docType: item.docType },
+        })),
+      );
+      const done = response.results
+        .filter((result) => result.status === 'created' || result.status === 'updated')
+        .map((result) => result.clientUuid);
+      await removeQueued(activeBusinessId, done);
+      const remaining = (await readQueue(activeBusinessId)).length;
+
+      return {
+        sent: queue.length,
+        synced: done.length,
+        conflicts: response.results.filter((result) => result.status === 'conflict').length,
+        remaining,
+      };
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['offline-drafts', activeBusinessId] });
       void queryClient.invalidateQueries({ queryKey: ['documents', activeBusinessId] });
       void queryClient.invalidateQueries({ queryKey: queryKeys.summary(activeBusinessId) });
     },

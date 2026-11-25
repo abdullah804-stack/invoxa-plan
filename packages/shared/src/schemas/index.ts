@@ -13,3 +13,4 @@ export * from './expense.js';
 export * from './project.js';
 export * from './team.js';
 export * from './backup.js';
+export * from './report.js';

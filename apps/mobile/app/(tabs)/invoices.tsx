@@ -20,7 +20,12 @@ import { SkeletonRows } from '../../src/components/Skeleton';
 import { EmptyState, ErrorState } from '../../src/components/States';
 import { SwipeRow } from '../../src/components/SwipeRow';
 import { TextField } from '../../src/components/TextField';
-import { useDocumentPages, useDuplicateDocument } from '../../src/api/hooks';
+import {
+  useDocumentPages,
+  useDuplicateDocument,
+  useOfflineDrafts,
+  useSyncOfflineDrafts,
+} from '../../src/api/hooks';
 import { useSession } from '../../src/auth/SessionProvider';
 import { errorMessage } from '../../src/lib/errors';
 import { radius, spacing, typeScale } from '../../src/theme/tokens';
@@ -61,6 +66,8 @@ export default function InvoicesScreen() {
   const router = useRouter();
   const { activeRole } = useSession();
   const duplicate = useDuplicateDocument();
+  const offline = useOfflineDrafts();
+  const syncOffline = useSyncOfflineDrafts();
 
   const [docType, setDocType] = useState<DocType>('invoice');
   const [status, setStatus] = useState<StatusFilter>('all');
@@ -186,6 +193,47 @@ export default function InvoicesScreen() {
           </View>
         </View>
 
+        {(offline.data?.length ?? 0) > 0 ? (
+          <View
+            style={[
+              styles.offlineBanner,
+              { backgroundColor: colors.accentSoft, borderColor: colors.accent },
+            ]}
+          >
+            <View style={styles.offlineText}>
+              <Text style={[styles.offlineTitle, { color: colors.text }]}>
+                {offline.data?.length} draft{(offline.data?.length ?? 0) === 1 ? '' : 's'} saved on
+                this phone
+              </Text>
+              <Text style={[styles.offlineNote, { color: colors.textMuted }]}>
+                They sync when you are back online. Nothing is lost.
+              </Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Sync offline drafts"
+              disabled={syncOffline.isPending}
+              onPress={() =>
+                syncOffline.mutate(undefined, {
+                  onSuccess: (result) =>
+                    showNotice(
+                      result.remaining === 0
+                        ? `${result.synced} of ${result.sent} synced.`
+                        : `${result.synced} synced, ${result.conflicts} need attention.`,
+                    ),
+                  onError: (error) => showNotice(errorMessage(error)),
+                })
+              }
+            >
+              {syncOffline.isPending ? (
+                <ActivityIndicator color={colors.accent} />
+              ) : (
+                <Text style={[styles.offlineAction, { color: colors.accent }]}>Sync now</Text>
+              )}
+            </Pressable>
+          </View>
+        ) : null}
+
         <TextField
           value={search}
           onChangeText={setSearch}
@@ -305,6 +353,29 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typeScale.display,
+  },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  offlineText: {
+    flex: 1,
+    gap: 2,
+  },
+  offlineTitle: {
+    ...typeScale.bodyStrong,
+  },
+  offlineNote: {
+    ...typeScale.small,
+  },
+  offlineAction: {
+    ...typeScale.bodyStrong,
   },
   headerActions: {
     flexDirection: 'row',
