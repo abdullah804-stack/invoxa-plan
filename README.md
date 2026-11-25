@@ -29,27 +29,35 @@ npm run dev:api      # Fastify API on PORT (default 4000)
 npm run dev:mobile   # Expo app (Expo Go or a dev build)
 ```
 
-### API (M2–M10)
+### API (M2–M13)
 
 Base path `/api/v1`. All routes except `register`, `login` and `health` need
 `Authorization: Bearer <jwt>`; business routes read `X-Business-Id` (first business if absent)
 and `X-Timezone`.
 
-| Area      | Endpoints                                                                                                                                                    |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Health    | `GET /health` (no auth, no database call)                                                                                                                    |
-| Auth      | `POST /auth/register`, `POST /auth/login`, `GET /auth/me`, `DELETE /auth/me`                                                                                 |
-| Profile   | `GET /profile`, `PUT /profile`, `PUT`/`DELETE /profile/logo`, `PUT`/`DELETE /profile/signature`, `GET /brand-assets/:id`                                     |
-| Clients   | `GET`/`POST /clients`, `GET`/`PUT`/`DELETE /clients/:id` (the detail read includes per-currency billed, paid and outstanding)                                |
-| Documents | `GET`/`POST /invoices`, `GET`/`PUT`/`DELETE /invoices/:id`, plus `/issue`, `/payments`, `/status`, `/duplicate`, `/convert`, `/apply-credit`                 |
-| Reports   | `GET /reports/summary`, `GET /reports/expenses` (per category and currency)                                                                                  |
-| AI        | `POST /ai/draft` (a sentence in, a validated draft suggestion out; no document is written), `POST /ai/scan-receipt` (photo in, fields out, image discarded)  |
-| Reminders | `GET /reminders` (overdue and due-soon sent invoices inside the business warning window)                                                                     |
-| Recurring | `GET`/`POST /recurring`, `GET`/`PUT`/`DELETE /recurring/:id`, `POST /recurring/run` (idempotent; job secret or a signed-in user)                             |
-| Projects  | `GET`/`POST /projects`, `GET`/`PUT`/`DELETE /projects/:id`, `POST /projects/:id/bill` (unbilled time into one draft invoice)                                 |
-| Time      | `GET`/`POST /time-entries`, `PUT`/`DELETE /time-entries/:id` (unbilled entries only), `GET /timer`, `POST /timer/start`, `POST /timer/stop`, `DELETE /timer` |
-| Expenses  | `GET`/`POST /expenses`, `GET`/`PUT`/`DELETE /expenses/:id` (billable ones can go on a draft, once)                                                           |
-| Extras    | `GET`/`POST /saved-items`, `DELETE /saved-items/:id`                                                                                                         |
+| Area       | Endpoints                                                                                                                                                    |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Health     | `GET /health` (no auth, no database call)                                                                                                                    |
+| Auth       | `POST /auth/register`, `POST /auth/login`, `GET /auth/me`, `DELETE /auth/me`                                                                                 |
+| Profile    | `GET /profile`, `PUT /profile`, `PUT`/`DELETE /profile/logo`, `PUT`/`DELETE /profile/signature`, `GET /brand-assets/:id`                                     |
+| Clients    | `GET`/`POST /clients`, `GET`/`PUT`/`DELETE /clients/:id` (the detail read includes per-currency billed, paid and outstanding)                                |
+| Documents  | `GET`/`POST /invoices`, `GET`/`PUT`/`DELETE /invoices/:id`, plus `/issue`, `/payments`, `/status`, `/duplicate`, `/convert`, `/apply-credit`                 |
+| Reports    | `GET /reports/summary`, `GET /reports/expenses` (per category and currency)                                                                                  |
+| AI         | `POST /ai/draft` (a sentence in, a validated draft suggestion out; no document is written), `POST /ai/scan-receipt` (photo in, fields out, image discarded)  |
+| Reminders  | `GET /reminders` (overdue and due-soon sent invoices inside the business warning window)                                                                     |
+| Recurring  | `GET`/`POST /recurring`, `GET`/`PUT`/`DELETE /recurring/:id`, `POST /recurring/run` (idempotent; job secret or a signed-in user)                             |
+| Projects   | `GET`/`POST /projects`, `GET`/`PUT`/`DELETE /projects/:id`, `POST /projects/:id/bill` (unbilled time into one draft invoice)                                 |
+| Time       | `GET`/`POST /time-entries`, `PUT`/`DELETE /time-entries/:id` (unbilled entries only), `GET /timer`, `POST /timer/start`, `POST /timer/stop`, `DELETE /timer` |
+| Expenses   | `GET`/`POST /expenses`, `GET`/`PUT`/`DELETE /expenses/:id` (billable ones can go on a draft, once)                                                           |
+| Extras     | `GET`/`POST /saved-items`, `DELETE /saved-items/:id`                                                                                                         |
+| Businesses | `GET`/`POST /businesses` (each is its own tenant; creating one makes you its owner)                                                                          |
+| Team       | `GET /members`, `PUT`/`DELETE /members/:id`, `POST /members/leave`, `POST /members/transfer-ownership`                                                       |
+| Invites    | `POST /invites`, `DELETE /invites/:id`, `POST /invites/accept` (8 characters, hashed, one use, 7 days)                                                       |
+| Activity   | `GET /activity` (newest first, keyset paged, newest 250 per business; owners and staff)                                                                      |
+
+Roles are owner, staff and viewer, enforced by one shared matrix on every route and hidden in the
+app. A viewer can read; staff can invoice, take payments and add clients; only an owner changes
+settings, voids documents and manages the team. A business always keeps at least one owner.
 
 Errors always use `{ "error": { "code", "message", "details": [] } }`. A record in another
 business returns 404, never 403. Copy `apps/api/.env.example` to `apps/api/.env`; the server

@@ -40,6 +40,7 @@ import {
 } from '../services/documents.js';
 import { Project, TimeEntry } from '../models/project.js';
 import { assignDocumentNumber } from '../services/numbering.js';
+import { logActivity } from '../services/activity.js';
 import { requireAction, resolveTenant, type TenantContext } from '../tenant.js';
 import { parseOrThrow } from '../validation.js';
 
@@ -477,6 +478,12 @@ export const documentRoutes: FastifyPluginAsync<DocumentRouteOptions> = async (a
     await markTimeBilled(doc, billed);
     await setExpenseBilling(doc, expenseIds);
 
+    await logActivity(context, {
+      type: 'document.created',
+      summary: `Saved a ${input.docType.replace('_', ' ')} draft`,
+      entityId: String(doc._id),
+    });
+
     return reply.code(201).send({ document: serializeDocument(doc, requestToday(request)) });
   });
 
@@ -684,6 +691,13 @@ export const documentRoutes: FastifyPluginAsync<DocumentRouteOptions> = async (a
     applyTotals(doc);
     await doc.save();
 
+    await logActivity(context, {
+      type: 'late_fee.added',
+      summary: `Added a late fee to ${doc.number ?? 'an invoice'}`,
+      entityId: String(doc._id),
+      ...(doc.number ? { entityLabel: doc.number } : {}),
+    });
+
     return { document: serializeDocument(doc, today), amount };
   });
 
@@ -724,6 +738,13 @@ export const documentRoutes: FastifyPluginAsync<DocumentRouteOptions> = async (a
     doc.status = 'sent';
     applyTotals(doc);
     await doc.save();
+
+    await logActivity(context, {
+      type: 'document.issued',
+      summary: `Issued ${doc.number}`,
+      entityId: String(doc._id),
+      ...(doc.number ? { entityLabel: doc.number } : {}),
+    });
 
     return { document: serializeDocument(doc, requestToday(request)) };
   });
@@ -770,6 +791,13 @@ export const documentRoutes: FastifyPluginAsync<DocumentRouteOptions> = async (a
         doc.status = 'paid';
       }
       await doc.save();
+
+      await logActivity(context, {
+        type: 'payment.recorded',
+        summary: `Recorded a payment on ${doc.number ?? 'a document'}`,
+        entityId: String(doc._id),
+        ...(doc.number ? { entityLabel: doc.number } : {}),
+      });
 
       return reply.code(201).send({ document: serializeDocument(doc, requestToday(request)) });
     },
@@ -822,6 +850,16 @@ export const documentRoutes: FastifyPluginAsync<DocumentRouteOptions> = async (a
     }
 
     await doc.save();
+
+    if (input.status === 'void') {
+      await logActivity(context, {
+        type: 'document.voided',
+        summary: `Voided ${doc.number ?? 'a document'}`,
+        entityId: String(doc._id),
+        ...(doc.number ? { entityLabel: doc.number } : {}),
+      });
+    }
+
     return { document: serializeDocument(doc, requestToday(request)) };
   });
 

@@ -14,6 +14,7 @@ import { BrandAsset } from '../models/brandAsset.js';
 import { Business } from '../models/business.js';
 import { scoped } from '../scoped.js';
 import { applyBusinessUpdate, serializeBusiness } from '../services/business.js';
+import { logActivity } from '../services/activity.js';
 import { requireAction, resolveTenant } from '../tenant.js';
 import { parseOrThrow } from '../validation.js';
 
@@ -129,6 +130,15 @@ export const profileRoutes: FastifyPluginAsync<ProfileRouteOptions> = async (app
     const input = parseOrThrow(updateSchema, request.body);
     applyBusinessUpdate(business, input);
     await business.save();
+
+    await logActivity(context, {
+      type: input.branding !== undefined ? 'brand.updated' : 'business.updated',
+      summary:
+        input.branding !== undefined
+          ? 'Updated the brand and invoice look'
+          : 'Updated business settings',
+      entityId: context.businessId,
+    });
 
     return {
       business: serializeBusiness(business),

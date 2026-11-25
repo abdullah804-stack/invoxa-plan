@@ -28,6 +28,7 @@ import {
   requestToday,
   serializeDocument,
 } from '../services/documents.js';
+import { logActivity } from '../services/activity.js';
 import { scoped } from '../scoped.js';
 import { requireAction, resolveTenant, type TenantContext } from '../tenant.js';
 import { parseOrThrow } from '../validation.js';
@@ -339,6 +340,13 @@ export const projectRoutes: FastifyPluginAsync<ProjectRouteOptions> = async (app
       currency: project.currency,
       billable: input.billable,
       createdBy: new Types.ObjectId(context.userId),
+    });
+
+    await logActivity(context, {
+      type: 'time.logged',
+      summary: `Logged ${input.minutes} minutes on ${project.name}`,
+      entityId: String(entry._id),
+      entityLabel: project.name,
     });
 
     return reply.code(201).send({ entry: serializeTimeEntry(entry as TimeEntryDocument) });

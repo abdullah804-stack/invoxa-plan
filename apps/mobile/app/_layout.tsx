@@ -79,6 +79,11 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
         <Stack.Screen name="recurring/new" />
         <Stack.Screen name="expense/new" />
         <Stack.Screen name="expense/report" />
+        <Stack.Screen name="business/index" />
+        <Stack.Screen name="business/new" />
+        <Stack.Screen name="business/join" />
+        <Stack.Screen name="business/team" />
+        <Stack.Screen name="activity" />
         <Stack.Screen name="projects/index" />
         <Stack.Screen name="project/new" />
         <Stack.Screen name="project/[id]" />

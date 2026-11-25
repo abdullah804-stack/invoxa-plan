@@ -5,6 +5,7 @@ import type { ApiConfig } from '../config.js';
 import { authenticate } from '../auth/authenticate.js';
 import { errors } from '../errors.js';
 import { Expense, type ExpenseRecord } from '../models/expense.js';
+import { logActivity } from '../services/activity.js';
 import { requestToday } from '../services/documents.js';
 import { scoped } from '../scoped.js';
 import { requireAction, resolveTenant, type TenantContext } from '../tenant.js';
@@ -122,6 +123,13 @@ export const expenseRoutes: FastifyPluginAsync<ExpenseRouteOptions> = async (app
     const expense = await scoped(Expense, context).create({
       ...input,
       createdBy: new Types.ObjectId(context.userId),
+    });
+
+    await logActivity(context, {
+      type: 'expense.added',
+      summary: `Added ${input.description}`,
+      entityId: String(expense._id),
+      entityLabel: input.description,
     });
 
     return reply.code(201).send({ expense: serialize(expense as ExpenseDocument) });

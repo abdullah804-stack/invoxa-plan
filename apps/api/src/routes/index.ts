@@ -1,7 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import { API_BASE_PATH } from '@invoxa/shared';
 import type { ApiConfig } from '../config.js';
+import { activityRoutes } from './activity.js';
 import { aiRoutes } from './ai.js';
+import { businessRoutes } from './business.js';
 import { authRoutes } from './auth.js';
 import { clientRoutes } from './clients.js';
 import { documentRoutes } from './documents.js';
@@ -20,6 +22,8 @@ export async function registerRoutes(app: FastifyInstance, config: ApiConfig): P
       await api.register(healthRoutes);
       await api.register(authRoutes, { config });
       await api.register(profileRoutes, { config });
+      await api.register(businessRoutes, { config });
+      await api.register(activityRoutes, { config });
       await api.register(clientRoutes, { config });
       await api.register(documentRoutes, { config });
       await api.register(savedItemRoutes, { config });

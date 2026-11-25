@@ -21,6 +21,7 @@ import {
   shownStatusFor,
   totalsFor,
 } from '../services/documents.js';
+import { logActivity } from '../services/activity.js';
 import { requireAction, resolveTenant } from '../tenant.js';
 import { parseOrThrow } from '../validation.js';
 
@@ -124,6 +125,13 @@ export const clientRoutes: FastifyPluginAsync<ClientRouteOptions> = async (app, 
       ...(input.taxId ? { taxId: input.taxId } : {}),
       ...(input.notes ? { notes: input.notes } : {}),
       archived: false,
+    });
+
+    await logActivity(context, {
+      type: 'client.added',
+      summary: `Added ${client.name}`,
+      entityId: String(client._id),
+      entityLabel: client.name,
     });
 
     return reply.code(201).send({ client: serializeClient(client) });

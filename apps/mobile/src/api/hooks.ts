@@ -1,10 +1,13 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from '../auth/SessionProvider';
 import {
+  acceptInvite,
   applyLateFee,
   billProjectTime,
+  createBusiness,
   createClient,
   createDocument,
+  createInvite,
   createExpense,
   createProject,
   createRecurring,
@@ -18,6 +21,7 @@ import {
   deleteTimeEntry,
   discardTimer,
   draftWithAi,
+  fetchTeam,
   duplicateDocument,
   fetchExpenseReport,
   fetchReminders,
@@ -30,6 +34,8 @@ import {
   fetchSummary,
   fetchTimer,
   issueDocument,
+  leaveBusiness,
+  listActivity,
   listClients,
   listDocuments,
   listExpenses,
@@ -39,14 +45,18 @@ import {
   listTimeEntries,
   recordPayment,
   removeLogo,
+  removeMember,
+  revokeInvite,
   runRecurring,
   scanReceipt,
   setDocumentStatus,
   startTimer,
   stopTimer,
+  transferOwnership,
   updateClient,
   updateDocument,
   updateExpense,
+  updateMemberRole,
   updateProfile,
   updateProject,
   updateRecurring,
@@ -100,7 +110,89 @@ export const queryKeys = {
   project: (businessId: string | null, id: string) => ['project', businessId, id] as const,
   timeEntries: (businessId: string | null, projectId: string) =>
     ['time-entries', businessId, projectId] as const,
+  team: (businessId: string | null) => ['team', businessId] as const,
+  activity: (businessId: string | null) => ['activity', businessId] as const,
 };
+
+export function useTeam() {
+  const { status, activeBusinessId } = useSession();
+  return useQuery({
+    queryKey: queryKeys.team(activeBusinessId),
+    queryFn: fetchTeam,
+    enabled: status === 'signedIn' && Boolean(activeBusinessId),
+  });
+}
+
+function useTeamInvalidation() {
+  const queryClient = useQueryClient();
+  const { activeBusinessId } = useSession();
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.team(activeBusinessId) });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.activity(activeBusinessId) });
+  };
+}
+
+export function useCreateInvite() {
+  const invalidate = useTeamInvalidation();
+  return useMutation({
+    mutationFn: (role: 'staff' | 'viewer') => createInvite(role),
+    onSuccess: invalidate,
+  });
+}
+
+export function useRevokeInvite() {
+  const invalidate = useTeamInvalidation();
+  return useMutation({ mutationFn: (id: string) => revokeInvite(id), onSuccess: invalidate });
+}
+
+export function useAcceptInvite() {
+  return useMutation({ mutationFn: (code: string) => acceptInvite(code) });
+}
+
+export function useCreateBusiness() {
+  return useMutation({
+    mutationFn: (input: { name: string; currency?: string; language?: string }) =>
+      createBusiness(input),
+  });
+}
+
+export function useUpdateMemberRole() {
+  const invalidate = useTeamInvalidation();
+  return useMutation({
+    mutationFn: ({ id, role }: { id: string; role: 'staff' | 'viewer' }) =>
+      updateMemberRole(id, role),
+    onSuccess: invalidate,
+  });
+}
+
+export function useRemoveMember() {
+  const invalidate = useTeamInvalidation();
+  return useMutation({ mutationFn: (id: string) => removeMember(id), onSuccess: invalidate });
+}
+
+export function useLeaveBusiness() {
+  return useMutation({ mutationFn: leaveBusiness });
+}
+
+export function useTransferOwnership() {
+  const invalidate = useTeamInvalidation();
+  return useMutation({
+    mutationFn: (membershipId: string) => transferOwnership(membershipId),
+    onSuccess: invalidate,
+  });
+}
+
+/** The log pages backwards; a new entry cannot shift an existing row. */
+export function useActivityPages(enabled: boolean) {
+  const { activeBusinessId } = useSession();
+  return useInfiniteQuery({
+    queryKey: queryKeys.activity(activeBusinessId),
+    queryFn: ({ pageParam }) => listActivity(pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled,
+  });
+}
 
 export function useProfile() {
   const { status, activeBusinessId } = useSession();

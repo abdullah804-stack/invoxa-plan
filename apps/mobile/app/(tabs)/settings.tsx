@@ -37,7 +37,8 @@ const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
 
 export default function SettingsScreen() {
   const { colors, mode, setMode } = useTheme();
-  const { user, activeRole, signOut } = useSession();
+  const { user, activeRole, signOut, businesses, activeBusinessId, setActiveBusiness } =
+    useSession();
   const profile = useProfile();
   const router = useRouter();
 
@@ -47,6 +48,7 @@ export default function SettingsScreen() {
   const canManageReminders = activeRole ? can(activeRole, 'business:update') : false;
   const canRepeat = activeRole ? can(activeRole, 'drafts:create') : false;
   const canManageLateFee = activeRole ? can(activeRole, 'lateFee:configure') : false;
+  const canReadActivity = activeRole ? can(activeRole, 'activity:read') : false;
   const version = Constants.expoConfig?.version ?? '0.1.0';
 
   const [remindersEnabled, setRemindersEnabled] = useState(true);
@@ -182,6 +184,20 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Business</Text>
           <Card style={styles.card}>
+            {businesses.length > 1 ? (
+              <View style={styles.switcher}>
+                <Text style={[styles.metaLabel, { color: colors.textMuted }]}>Active business</Text>
+                <Segmented
+                  options={businesses.map((entry) => ({
+                    value: entry.id,
+                    label: entry.name.length > 14 ? `${entry.name.slice(0, 13)}…` : entry.name,
+                  }))}
+                  value={activeBusinessId ?? ''}
+                  onChange={(id) => setActiveBusiness(id)}
+                  accessibilityLabel="Switch business"
+                />
+              </View>
+            ) : null}
             <View style={styles.row}>
               <View style={styles.rowText}>
                 <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>
@@ -245,6 +261,63 @@ export default function SettingsScreen() {
                 ) : null}
               </View>
             ) : null}
+          </Card>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Team</Text>
+          <Card style={styles.card}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Team and roles"
+              onPress={() => router.push('/business/team')}
+            >
+              <View style={styles.row}>
+                <View style={styles.rowText}>
+                  <Text style={[styles.rowTitle, { color: colors.text }]}>Team & roles</Text>
+                  <Text style={[styles.rowSubtitle, { color: colors.textMuted }]}>
+                    Invite staff or viewers, change roles, transfer ownership.
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.accent} />
+              </View>
+            </Pressable>
+            {canReadActivity ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Activity log"
+                onPress={() => router.push('/activity')}
+                style={[
+                  styles.row,
+                  { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md },
+                ]}
+              >
+                <View style={styles.rowText}>
+                  <Text style={[styles.rowTitle, { color: colors.text }]}>Activity log</Text>
+                  <Text style={[styles.rowSubtitle, { color: colors.textMuted }]}>
+                    Who issued, recorded and changed what.
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.accent} />
+              </Pressable>
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Businesses"
+              onPress={() => router.push('/business')}
+              style={[
+                styles.row,
+                { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md },
+              ]}
+            >
+              <View style={styles.rowText}>
+                <Text style={[styles.rowTitle, { color: colors.text }]}>Businesses</Text>
+                <Text style={[styles.rowSubtitle, { color: colors.textMuted }]}>
+                  Switch, create another, or join with an invite code.
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.accent} />
+            </Pressable>
           </Card>
         </View>
 
@@ -483,6 +556,10 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     paddingTop: spacing.md,
     gap: spacing.md,
+  },
+  switcher: {
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
   },
   languageBlock: {
     gap: spacing.sm,

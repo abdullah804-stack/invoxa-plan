@@ -4,7 +4,7 @@
  * its own totals, it shows what the server computed.
  */
 
-import type { Role, ShownStatus, StoredDocumentStatus } from '@invoxa/shared';
+import type { ActivityType, Role, ShownStatus, StoredDocumentStatus } from '@invoxa/shared';
 
 export interface User {
   id: string;
@@ -503,4 +503,54 @@ export interface TimeEntryInput {
 export interface TimeEntryListResponse {
   entries: TimeEntry[];
   totals: ProjectTime;
+}
+
+export interface BusinessSummary extends BusinessRef {
+  memberCount: number;
+}
+
+export interface Member {
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  role: Role;
+  joinedAt: string | null;
+  isYou: boolean;
+}
+
+export interface PendingInvite {
+  id: string;
+  role: 'staff' | 'viewer';
+  createdAt: string | null;
+  expiresAt: string;
+}
+
+export interface TeamResponse {
+  members: Member[];
+  invites: PendingInvite[];
+}
+
+export interface CreatedInvite {
+  id: string;
+  role: 'staff' | 'viewer';
+  code: string;
+  expiresAt: string;
+}
+
+export interface ActivityEntry {
+  id: string;
+  type: ActivityType;
+  summary: string;
+  actorName: string;
+  actorRole: Role;
+  entityId: string | null;
+  entityLabel: string | null;
+  createdAt: string | null;
+}
+
+export interface ActivityPage {
+  entries: ActivityEntry[];
+  nextCursor: string | null;
+  limit: number;
 }

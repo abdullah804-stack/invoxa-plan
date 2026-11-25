@@ -1,9 +1,13 @@
 import { apiRequest } from './client';
 import type {
+  ActivityPage,
   AiDraftResponse,
   BrandAsset,
   Business,
   BusinessRef,
+  BusinessSummary,
+  CreatedInvite,
+  TeamResponse,
   Client,
   ClientDetailResponse,
   ClientListParams,
@@ -445,4 +449,67 @@ export function fetchExpenseReport(
   return apiRequest<ExpenseReport>('/reports/expenses', {
     query: { from: params.from, to: params.to },
   });
+}
+
+export function listBusinesses(): Promise<{ businesses: BusinessSummary[] }> {
+  return apiRequest<{ businesses: BusinessSummary[] }>('/businesses');
+}
+
+export function createBusiness(input: {
+  name: string;
+  currency?: string;
+  language?: string;
+}): Promise<{ business: BusinessRef }> {
+  return apiRequest<{ business: BusinessRef }>('/businesses', { method: 'POST', body: input });
+}
+
+export function fetchTeam(): Promise<TeamResponse> {
+  return apiRequest<TeamResponse>('/members');
+}
+
+export function createInvite(role: 'staff' | 'viewer'): Promise<{ invite: CreatedInvite }> {
+  return apiRequest<{ invite: CreatedInvite }>('/invites', { method: 'POST', body: { role } });
+}
+
+export function revokeInvite(id: string): Promise<null> {
+  return apiRequest<null>(`/invites/${id}`, { method: 'DELETE' });
+}
+
+export function acceptInvite(code: string): Promise<{ business: BusinessRef }> {
+  return apiRequest<{ business: BusinessRef }>('/invites/accept', {
+    method: 'POST',
+    body: { code },
+  });
+}
+
+export function updateMemberRole(
+  id: string,
+  role: 'staff' | 'viewer',
+): Promise<{ member: { id: string; role: 'staff' | 'viewer' } }> {
+  return apiRequest<{ member: { id: string; role: 'staff' | 'viewer' } }>(`/members/${id}`, {
+    method: 'PUT',
+    body: { role },
+  });
+}
+
+export function removeMember(id: string): Promise<null> {
+  return apiRequest<null>(`/members/${id}`, { method: 'DELETE' });
+}
+
+export function leaveBusiness(): Promise<null> {
+  return apiRequest<null>('/members/leave', { method: 'POST', body: {} });
+}
+
+export function transferOwnership(membershipId: string): Promise<{
+  member: { id: string; role: string };
+  you: { role: string };
+}> {
+  return apiRequest<{ member: { id: string; role: string }; you: { role: string } }>(
+    '/members/transfer-ownership',
+    { method: 'POST', body: { membershipId } },
+  );
+}
+
+export function listActivity(cursor?: string): Promise<ActivityPage> {
+  return apiRequest<ActivityPage>('/activity', { query: { cursor, limit: 50 } });
 }

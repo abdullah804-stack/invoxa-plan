@@ -31,6 +31,8 @@ interface SessionContextValue {
   }) => Promise<void>;
   signOut: () => Promise<void>;
   setActiveBusiness: (id: string) => void;
+  /** Re-reads the membership list, e.g. after creating or joining a business. */
+  refreshBusinesses: (preferId?: string) => Promise<BusinessRef[]>;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -191,6 +193,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [businesses, queryClient],
   );
 
+  const refreshBusinesses = useCallback(
+    async (preferId?: string) => {
+      const me = await fetchMe();
+      const active = pickActiveId(preferId ?? activeBusinessId, me.businesses);
+      setUser(me.user);
+      setBusinesses(me.businesses);
+      setActiveBusinessId(active);
+      setActiveBusinessIdHeader(active);
+      await Promise.all([
+        writeSecure(StorageKeys.user, JSON.stringify(me.user)),
+        writeSecure(StorageKeys.businesses, JSON.stringify(me.businesses)),
+        active ? writeSecure(StorageKeys.businessId, active) : removeSecure(StorageKeys.businessId),
+      ]);
+      // The new role and business change what every cached query may show.
+      queryClient.clear();
+      return me.businesses;
+    },
+    [activeBusinessId, queryClient],
+  );
+
   const activeRole = useMemo<Role | null>(
     () => businesses.find((business) => business.id === activeBusinessId)?.role ?? null,
     [businesses, activeBusinessId],
@@ -207,6 +229,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       register,
       signOut,
       setActiveBusiness,
+      refreshBusinesses,
     }),
     [
       status,
@@ -218,6 +241,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       register,
       signOut,
       setActiveBusiness,
+      refreshBusinesses,
     ],
   );
 

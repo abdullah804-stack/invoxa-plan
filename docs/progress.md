@@ -356,3 +356,28 @@ and the late-fee test vector passes — the API side is verified with a stubbed 
 real database. What is verified: 99 shared tests, 98 API tests, strict TypeScript, ESLint, Prettier,
 and Android and web Metro bundles. No receipt photo was sent to Google (no `GEMINI_API_KEY` here) and
 no screen was clicked, because no phone is attached to this workspace.
+
+## M13 — Multiple businesses, team seats and activity log (week 13) — built
+
+**Goal:** shared businesses with safe roles.
+
+- [x] `GET`/`POST /businesses`: one account can own or join several businesses; each has its own
+      clients, numbering, brand, reminders and reports (both first invoices are `INV-0001`)
+- [x] `X-Business-Id` selects the membership on every business route; a non-member still gets 404
+- [x] Business switcher appears only with more than one business; creating another and joining one
+      update the session without a restart
+- [x] Invite codes: 8 characters, SHA-256 hashed at rest, one use, 7-day expiry, owner-only, with
+      share-sheet sharing; joining happens on a screen of its own
+- [x] Role table enforced on every endpoint: a viewer cannot issue, write or manage the team, staff
+      cannot invite or change roles, and only owners void, configure and transfer
+- [x] Leave, remove member, change role and transfer ownership; a business always keeps one owner
+- [x] Activity log: `GET /activity` newest first with keyset paging, capped at the newest 250 per
+      business, written for issues, voids, payments, late fees, clients, expenses, time, team and
+      settings; owners and staff read it, viewers do not
+- [x] New shared schemas and labels; 9 new API tests for businesses, roles, invites, ownership and
+      the log
+
+**Done when:** a staff member can issue an invoice, a viewer cannot, and neither can read another
+business's data — verified against the API with a real database: 9 new tests plus the whole suite.
+No screen was clicked and no invite was shared from a phone, because no device is attached to this
+workspace.

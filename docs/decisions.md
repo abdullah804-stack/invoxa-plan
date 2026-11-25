@@ -491,3 +491,37 @@ renderer already prints.
 `GET /reports/expenses` returns totals per currency and per category, with a count, for a date
 range. Adding dollars to euros would produce a number that means nothing, so every currency is its
 own row, as on the dashboard.
+
+## 24 November 2026 — Week 13
+
+### One person, several businesses, one active tenant
+
+A business is the tenant, and a membership is the only key to it. `X-Business-Id` selects which
+membership a request uses, so the same account can be an owner of a shop and staff in a studio
+without any endpoint learning about it. Creating a business writes the business and its owner
+membership together, exactly like registration; every business starts with its own counters, so
+both first invoices are `INV-0001`. The app shows a switcher only when there is more than one.
+
+### Invite codes are hashed, single use and short-lived
+
+`POST /invites` returns eight characters from an alphabet without look-alikes; the database keeps
+only a SHA-256 hash, so a stolen database dump cannot be replayed in the app. Accepting a code
+looks up the hash among unused, unrevoked, unexpired rows, refuses an existing member with 409 and
+marks the row used in the same request. An unknown code, an expired one and a revoked one are all
+the same 404, so codes cannot be probed. TTL on `expiresAt` also removes dead rows.
+
+### Roles are one matrix, checked before any data is read
+
+Owner, staff and viewer already existed in the schema; week 13 is where every team action uses them.
+`members:read` was added so viewers can see who else works here, while `invites:manage`,
+`members:manage` and `activity:read` stay owner (and staff for the log). Ownership moves only by
+transfer, which makes the target owner and the actor staff in one request, so a business can never
+be left without one: leaving, removing the last owner and changing an owner's role are all refused.
+
+### The activity log never fails the action it describes
+
+One row per meaningful event (issues, voids, payments, late fees, clients, expenses, time, team and
+settings), with the actor's name copied at write time so a removed member still reads. The newest
+250 rows per business are kept; older rows are deleted as new ones arrive, which is the retention
+rule that keeps a free 512 MB database from filling with history. Logging wraps its own failures:
+an invoice is issued whether or not its log row was written.

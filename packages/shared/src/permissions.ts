@@ -12,6 +12,7 @@ export type Action =
   | 'projects:read'
   | 'reports:read'
   | 'csv:export'
+  | 'members:read'
   | 'activity:read'
   | 'drafts:create'
   | 'drafts:deleteOwn'
@@ -45,6 +46,9 @@ const MATRIX: Record<Action, readonly Role[]> = {
   'projects:read': ['owner', 'staff', 'viewer'],
   'reports:read': ['owner', 'staff', 'viewer'],
   'csv:export': ['owner', 'staff', 'viewer'],
+  /** Everyone can see who else works here; only owners can change it. */
+  'members:read': ['owner', 'staff', 'viewer'],
+  /** The log names people and money, so a viewer does not see it. */
   'activity:read': ['owner', 'staff'],
 
   'drafts:create': ['owner', 'staff'],
