@@ -8,6 +8,7 @@ import {
   createClient,
   createDocument,
   createInvite,
+  deleteAccount,
   createExpense,
   createProject,
   createRecurring,
@@ -21,8 +22,9 @@ import {
   deleteTimeEntry,
   discardTimer,
   draftWithAi,
-  fetchTeam,
   duplicateDocument,
+  fetchBackup,
+  fetchTeam,
   fetchExpenseReport,
   fetchReminders,
   fetchBrandAsset,
@@ -43,9 +45,11 @@ import {
   listRecurring,
   listSavedItems,
   listTimeEntries,
+  previewBackup,
   recordPayment,
   removeLogo,
   removeMember,
+  restoreBackup,
   revokeInvite,
   runRecurring,
   scanReceipt,
@@ -65,6 +69,7 @@ import {
   type ProfileUpdate,
 } from './endpoints';
 import type {
+  BackupPreview,
   ClientListParams,
   DocumentDraftBody,
   DocumentListParams,
@@ -73,6 +78,7 @@ import type {
   ExpenseInput,
   PaymentInput,
   Profile,
+  RestoreResult,
   ProjectInput,
   ProjectStatus,
   ReceiptScanResult,
@@ -179,6 +185,39 @@ export function useTransferOwnership() {
   return useMutation({
     mutationFn: (membershipId: string) => transferOwnership(membershipId),
     onSuccess: invalidate,
+  });
+}
+
+export function useExportBackup() {
+  return useMutation({ mutationFn: fetchBackup });
+}
+
+export function usePreviewBackup() {
+  return useMutation({
+    mutationFn: (file: unknown): Promise<BackupPreview> => previewBackup(file),
+  });
+}
+
+export function useRestoreBackup() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (file: unknown): Promise<RestoreResult> => restoreBackup(file),
+    onSuccess: () => {
+      // A restore can change every number on every screen.
+      queryClient.clear();
+    },
+  });
+}
+
+export function useDeleteAccount() {
+  const { signOut } = useSession();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (password: string) => deleteAccount(password),
+    onSuccess: async () => {
+      queryClient.clear();
+      await signOut();
+    },
   });
 }
 

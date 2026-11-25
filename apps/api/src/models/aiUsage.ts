@@ -19,6 +19,8 @@ const aiUsageSchema = new Schema(
 );
 
 aiUsageSchema.index({ business: 1, user: 1, day: 1 }, { unique: true });
+/** Retention: usage rows older than 30 days are dropped by MongoDB itself. */
+aiUsageSchema.index({ updatedAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
 
 export type AiUsageRecord = InferSchemaType<typeof aiUsageSchema>;
 export const AiUsage = model('AiUsage', aiUsageSchema);

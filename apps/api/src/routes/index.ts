@@ -5,6 +5,7 @@ import { activityRoutes } from './activity.js';
 import { aiRoutes } from './ai.js';
 import { businessRoutes } from './business.js';
 import { authRoutes } from './auth.js';
+import { backupRoutes } from './backup.js';
 import { clientRoutes } from './clients.js';
 import { documentRoutes } from './documents.js';
 import { expenseRoutes } from './expenses.js';
@@ -23,6 +24,7 @@ export async function registerRoutes(app: FastifyInstance, config: ApiConfig): P
       await api.register(authRoutes, { config });
       await api.register(profileRoutes, { config });
       await api.register(businessRoutes, { config });
+      await api.register(backupRoutes, { config });
       await api.register(activityRoutes, { config });
       await api.register(clientRoutes, { config });
       await api.register(documentRoutes, { config });

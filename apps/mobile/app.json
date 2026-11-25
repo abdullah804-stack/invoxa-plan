@@ -26,7 +26,12 @@
       "expo-font",
       "expo-splash-screen",
       "expo-status-bar",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-document-picker",
+      [
+        "expo-local-authentication",
+        { "faceIDPermission": "Invoxa uses Face ID to unlock the app on this phone." }
+      ]
     ],
     "experiments": {
       "typedRoutes": false

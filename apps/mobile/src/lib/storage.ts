@@ -69,4 +69,6 @@ export const StorageKeys = {
   theme: 'invoxa.theme',
   /** One-time Gemini notice: prompts go to Google and may train its models. */
   aiConsent: 'invoxa.aiConsent',
+  /** Local app lock: enabled and the inactivity timeout, never sent anywhere. */
+  appLock: 'invoxa.appLock',
 } as const;

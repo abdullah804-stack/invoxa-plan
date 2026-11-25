@@ -12,6 +12,14 @@ import { Card } from '../../src/components/Card';
 import { Screen } from '../../src/components/Screen';
 import { Segmented } from '../../src/components/Segmented';
 import { TextField } from '../../src/components/TextField';
+import {
+  APP_LOCK_TIMEOUTS,
+  checkBiometrics,
+  loadAppLock,
+  saveAppLock,
+  type AppLockSettings,
+  type BiometricSupport,
+} from '../../src/lib/appLock';
 import { errorMessage } from '../../src/lib/errors';
 import { amountToInput, parseAmountToMinor } from '../../src/lib/money';
 import { ensureNotificationPermission } from '../../src/lib/reminders';
@@ -49,6 +57,7 @@ export default function SettingsScreen() {
   const canRepeat = activeRole ? can(activeRole, 'drafts:create') : false;
   const canManageLateFee = activeRole ? can(activeRole, 'lateFee:configure') : false;
   const canReadActivity = activeRole ? can(activeRole, 'activity:read') : false;
+  const canBackup = activeRole ? can(activeRole, 'backup:export') : false;
   const version = Constants.expoConfig?.version ?? '0.1.0';
 
   const [remindersEnabled, setRemindersEnabled] = useState(true);
@@ -62,8 +71,50 @@ export default function SettingsScreen() {
   const [lateFeeValue, setLateFeeValue] = useState('');
   const [lateFeeGrace, setLateFeeGrace] = useState('0');
   const [lateFeeNotice, setLateFeeNotice] = useState<string | null>(null);
+  const [appLock, setAppLock] = useState<AppLockSettings | null>(null);
+  const [biometrics, setBiometrics] = useState<BiometricSupport | null>(null);
+  const [lockNotice, setLockNotice] = useState<string | null>(null);
 
   const currency = business?.currency ?? 'USD';
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      const [settings, support] = await Promise.all([loadAppLock(), checkBiometrics()]);
+      if (!active) return;
+      setAppLock(settings);
+      setBiometrics(support);
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const setLockEnabled = async (enabled: boolean) => {
+    if (!appLock) return;
+    if (enabled && (!biometrics?.available || !biometrics.enrolled)) {
+      setLockNotice('Set up a fingerprint or face in your phone settings first.');
+      return;
+    }
+    const next = { ...appLock, enabled };
+    setAppLock(next);
+    await saveAppLock(next);
+    setLockNotice(
+      enabled
+        ? 'Saved. The app locks itself after the time you choose below.'
+        : 'Saved. App lock is off.',
+    );
+  };
+
+  const setLockTimeout = async (value: string) => {
+    if (!appLock) return;
+    const minutes = Number(value);
+    if (!Number.isFinite(minutes)) return;
+    const next = { ...appLock, timeoutMinutes: minutes };
+    setAppLock(next);
+    await saveAppLock(next);
+    setLockNotice('Saved. This setting stays on this phone.');
+  };
 
   useEffect(() => {
     const reminders = business?.reminders;
@@ -321,6 +372,50 @@ export default function SettingsScreen() {
           </Card>
         </View>
 
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Security</Text>
+          <Card style={styles.card}>
+            <View style={styles.row}>
+              <View style={styles.rowText}>
+                <Text style={[styles.rowTitle, { color: colors.text }]}>App lock</Text>
+                <Text style={[styles.rowSubtitle, { color: colors.textMuted }]}>
+                  {biometrics?.available && biometrics.enrolled
+                    ? `Ask for your ${biometrics.label} after the app has been in the background.`
+                    : 'Set up a fingerprint or face in your phone settings to use this.'}
+                </Text>
+              </View>
+              <Switch
+                value={appLock?.enabled ?? false}
+                onValueChange={(value) => void setLockEnabled(value)}
+                disabled={!biometrics?.available || !biometrics?.enrolled}
+                accessibilityLabel="App lock"
+                trackColor={{ true: colors.accentSoft, false: colors.surfaceMuted }}
+                thumbColor={appLock?.enabled ? colors.accent : colors.surface}
+              />
+            </View>
+            {appLock?.enabled ? (
+              <View style={[styles.languageBlock, { borderTopColor: colors.border }]}>
+                <Text style={[styles.metaLabel, { color: colors.textMuted }]}>Lock after</Text>
+                <Segmented
+                  options={APP_LOCK_TIMEOUTS.map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                  }))}
+                  value={String(appLock.timeoutMinutes)}
+                  onChange={(value) => void setLockTimeout(value)}
+                  accessibilityLabel="App lock timeout"
+                />
+              </View>
+            ) : null}
+            {lockNotice ? (
+              <Text style={[styles.hint, { color: colors.textMuted }]}>{lockNotice}</Text>
+            ) : null}
+            <Text style={[styles.hint, { color: colors.textMuted }]}>
+              The lock is local to this phone. The server never learns that it is on.
+            </Text>
+          </Card>
+        </View>
+
         {canManageReminders ? (
           <View style={styles.section}>
             <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Reminders</Text>
@@ -460,6 +555,67 @@ export default function SettingsScreen() {
             </Pressable>
           </View>
         ) : null}
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Data & privacy</Text>
+          <Card style={styles.card}>
+            {canBackup ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Backup and restore"
+                onPress={() => router.push('/backup')}
+              >
+                <View style={styles.row}>
+                  <View style={styles.rowText}>
+                    <Text style={[styles.rowTitle, { color: colors.text }]}>
+                      Backup &amp; restore
+                    </Text>
+                    <Text style={[styles.rowSubtitle, { color: colors.textMuted }]}>
+                      Export this business as JSON, or merge a file back in.
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.accent} />
+                </View>
+              </Pressable>
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Privacy notice"
+              onPress={() => router.push('/privacy')}
+              style={[
+                styles.row,
+                canBackup
+                  ? { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md }
+                  : null,
+              ]}
+            >
+              <View style={styles.rowText}>
+                <Text style={[styles.rowTitle, { color: colors.text }]}>Privacy notice</Text>
+                <Text style={[styles.rowSubtitle, { color: colors.textMuted }]}>
+                  What is stored, what Gemini sees, and what stays on your phone.
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.accent} />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Delete account"
+              onPress={() => router.push('/account/delete')}
+              style={[
+                styles.row,
+                { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md },
+              ]}
+            >
+              <View style={styles.rowText}>
+                <Text style={[styles.rowTitle, { color: colors.danger }]}>Delete account</Text>
+                <Text style={[styles.rowSubtitle, { color: colors.textMuted }]}>
+                  Remove your account and the businesses only you own.
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.danger} />
+            </Pressable>
+          </Card>
+        </View>
 
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Appearance</Text>

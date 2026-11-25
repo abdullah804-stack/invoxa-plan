@@ -6,10 +6,10 @@ import { authenticate } from '../auth/authenticate.js';
 import { hashPassword, verifyPassword } from '../auth/password.js';
 import { signToken } from '../auth/token.js';
 import { Business } from '../models/business.js';
-import { BrandAsset } from '../models/brandAsset.js';
 import { Membership } from '../models/membership.js';
 import { User } from '../models/user.js';
 import { defaultBusinessFields } from '../services/business.js';
+import { purgeBusiness } from '../services/purge.js';
 import { parseOrThrow } from '../validation.js';
 
 interface AuthRouteOptions {
@@ -152,10 +152,10 @@ export const authRoutes: FastifyPluginAsync<AuthRouteOptions> = async (app, { co
         );
       }
 
-      await BrandAsset.deleteMany({ business: membership.business });
-      await Business.deleteOne({ _id: membership.business });
+      await purgeBusiness(String(membership.business));
     }
 
+    // Memberships in other people's businesses just go; their data stays.
     await Membership.deleteMany({ userId: user._id });
     await User.deleteOne({ _id: user._id });
 

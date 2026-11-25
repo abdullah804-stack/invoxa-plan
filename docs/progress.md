@@ -381,3 +381,34 @@ no screen was clicked, because no phone is attached to this workspace.
 business's data — verified against the API with a real database: 9 new tests plus the whole suite.
 No screen was clicked and no invite was shared from a phone, because no device is attached to this
 workspace.
+
+## M14 — Data safety (week 14) — built
+
+**Goal:** users control and protect their data.
+
+- [x] `GET /backup` exports the active business as one versioned JSON file: profile and brand,
+      clients, projects, documents with payments and late fees, expenses, time and saved items
+- [x] `POST /backup/preview` validates the file and counts what it holds and what already exists;
+      `POST /backup/restore` merges by `clientUuid` (documents), name (clients and projects) and
+      contents (expenses, time, saved items) and recomputes every total
+- [x] Restored documents rejoin the receiving business's numbering; a second run of the same file
+      adds nothing
+- [x] Backup screen: export and share the JSON through the share sheet, pick a file, preview the
+      counts, confirm, and see what was added and kept
+- [x] App lock: fingerprint or face with a 1, 5 or 15 minute inactivity timeout, stored on the
+      phone; unavailable hardware disables the switch instead of faking it
+- [x] Delete account screen with the password and a plain list of what is removed; the API now
+      purges clients, documents, expenses, projects, time, invites, activity and AI usage, not just
+      the business and its images
+- [x] Privacy notice screen: what the server stores, what Gemini receives and what is discarded,
+      what stays on the phone, retention, and how to export or delete
+- [x] Retention: activity log capped at 250 rows per business (already), AI usage rows deleted
+      after 30 days by a TTL index
+- [x] 8 new API tests for export, restore totals, merge, malformed files, permissions, deletion,
+      retention and settings restore
+
+**Done when:** a backup restores onto a fresh install with identical totals, and deleting an
+account removes everything it solely owned — verified against the API with a real database: the
+restored invoice keeps its exact totals and paid amount, and after account deletion no user,
+business, client or document remains. No screen was clicked, no biometric prompt was shown and no
+file was shared, because no device is attached to this workspace.

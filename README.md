@@ -54,6 +54,7 @@ and `X-Timezone`.
 | Team       | `GET /members`, `PUT`/`DELETE /members/:id`, `POST /members/leave`, `POST /members/transfer-ownership`                                                       |
 | Invites    | `POST /invites`, `DELETE /invites/:id`, `POST /invites/accept` (8 characters, hashed, one use, 7 days)                                                       |
 | Activity   | `GET /activity` (newest first, keyset paged, newest 250 per business; owners and staff)                                                                      |
+| Backup     | `GET /backup` (one versioned JSON file per business), `POST /backup/preview`, `POST /backup/restore` (validated, merged by `clientUuid`; owner only)         |
 
 Roles are owner, staff and viewer, enforced by one shared matrix on every route and hidden in the
 app. A viewer can read; staff can invoice, take payments and add clients; only an owner changes

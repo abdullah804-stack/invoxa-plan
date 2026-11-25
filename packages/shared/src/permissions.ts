@@ -14,6 +14,8 @@ export type Action =
   | 'csv:export'
   | 'members:read'
   | 'activity:read'
+  | 'backup:export'
+  | 'backup:restore'
   | 'drafts:create'
   | 'drafts:deleteOwn'
   | 'drafts:deleteAny'
@@ -50,6 +52,9 @@ const MATRIX: Record<Action, readonly Role[]> = {
   'members:read': ['owner', 'staff', 'viewer'],
   /** The log names people and money, so a viewer does not see it. */
   'activity:read': ['owner', 'staff'],
+  /** A full copy of the business, and putting one back, is the owner's call. */
+  'backup:export': ['owner'],
+  'backup:restore': ['owner'],
 
   'drafts:create': ['owner', 'staff'],
   'drafts:deleteOwn': ['owner', 'staff'],

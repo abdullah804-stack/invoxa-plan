@@ -2,6 +2,7 @@ import { apiRequest } from './client';
 import type {
   ActivityPage,
   AiDraftResponse,
+  BackupPreview,
   BrandAsset,
   Business,
   BusinessRef,
@@ -23,6 +24,7 @@ import type {
   ExpenseReport,
   PaymentInput,
   Profile,
+  RestoreResult,
   Project,
   ProjectDetailResponse,
   ProjectInput,
@@ -512,4 +514,29 @@ export function transferOwnership(membershipId: string): Promise<{
 
 export function listActivity(cursor?: string): Promise<ActivityPage> {
   return apiRequest<ActivityPage>('/activity', { query: { cursor, limit: 50 } });
+}
+
+/** The whole business as plain JSON, ready to be written to a file and shared. */
+export function fetchBackup(): Promise<unknown> {
+  return apiRequest<unknown>('/backup', { timeoutMs: 60_000 });
+}
+
+export function previewBackup(file: unknown): Promise<BackupPreview> {
+  return apiRequest<BackupPreview>('/backup/preview', {
+    method: 'POST',
+    body: file,
+    timeoutMs: 60_000,
+  });
+}
+
+export function restoreBackup(file: unknown): Promise<RestoreResult> {
+  return apiRequest<RestoreResult>('/backup/restore', {
+    method: 'POST',
+    body: file,
+    timeoutMs: 120_000,
+  });
+}
+
+export function deleteAccount(password: string): Promise<null> {
+  return apiRequest<null>('/auth/me', { method: 'DELETE', body: { password } });
 }

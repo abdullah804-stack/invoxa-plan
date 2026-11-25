@@ -12,3 +12,4 @@ export * from './recurring.js';
 export * from './expense.js';
 export * from './project.js';
 export * from './team.js';
+export * from './backup.js';

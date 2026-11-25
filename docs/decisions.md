@@ -525,3 +525,43 @@ settings), with the actor's name copied at write time so a removed member still 
 250 rows per business are kept; older rows are deleted as new ones arrive, which is the retention
 rule that keeps a free 512 MB database from filling with history. Logging wraps its own failures:
 an invoice is issued whether or not its log row was written.
+
+## 24 November 2026 — Week 14
+
+### A backup is the same JSON the restore accepts
+
+`GET /backup` writes one file: the business profile and brand, clients, projects, documents with
+their payments and late fees, expenses, tracked time and saved items. There is no second format to
+keep in sync, because `POST /backup/preview` and `/backup/restore` parse the exported file with one
+Zod schema before touching the database. The restore route takes an 8 MB body so a few hundred
+invoices with signatures fit; every other route keeps its 1 MB limit.
+
+### Restore merges, and numbers start again
+
+Clients and projects match by name, documents by `clientUuid` (the device ID that already makes
+draft creation idempotent), and expenses, time entries and saved items by their contents, so running
+the same file twice adds nothing twice. A restored document gets a fresh number from the receiving
+business's series rather than the number in the file: two businesses would otherwise both claim
+`INV-0007`, and the file's number could belong to a document that still exists. Totals are always
+recomputed from the restored lines and payments, never trusted from the file.
+
+### The app lock is local, so the server cannot switch it off
+
+The setting and the inactivity timeout live in SecureStore and are checked with the OS biometric
+API, with a full-screen cover over every screen. The server never learns whether the lock is on, and
+no token is revoked, so a locked app resumes exactly where it was. Where the device has no enrolled
+fingerprint or face (including the web build) the switch is disabled rather than pretending to
+protect anything.
+
+### Deleting an account removes the records, not just the login
+
+"Delete account" used to remove the user, the business and its brand images, which would have left
+clients, invoices and expenses behind. Deletion now goes through one `purgeBusiness` helper that
+removes every collection carrying the business ID. It still refuses while anyone else belongs to a
+business the user owns, so nobody loses access to a shared workspace by someone else's deletion.
+
+### Retention is two explicit rules
+
+The activity log keeps the newest 250 entries per business, trimmed as new ones arrive. AI daily
+usage rows carry a 30-day TTL index, so the counters vanish without a job. Both are described on the
+privacy screen, and issued documents are voided rather than deleted so numbers stay meaningful.

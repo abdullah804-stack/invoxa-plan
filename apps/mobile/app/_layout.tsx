@@ -11,6 +11,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { AppLockGate } from '../src/auth/AppLockGate';
 import { SessionProvider, useSession } from '../src/auth/SessionProvider';
 import { ThemeProvider, useTheme } from '../src/theme/ThemeProvider';
 
@@ -66,34 +67,39 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   return (
     <>
       <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: colors.background },
-        }}
-      >
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="document/new" />
-        <Stack.Screen name="document/ai" />
-        <Stack.Screen name="recurring/index" />
-        <Stack.Screen name="recurring/new" />
-        <Stack.Screen name="expense/new" />
-        <Stack.Screen name="expense/report" />
-        <Stack.Screen name="business/index" />
-        <Stack.Screen name="business/new" />
-        <Stack.Screen name="business/join" />
-        <Stack.Screen name="business/team" />
-        <Stack.Screen name="activity" />
-        <Stack.Screen name="projects/index" />
-        <Stack.Screen name="project/new" />
-        <Stack.Screen name="project/[id]" />
-        <Stack.Screen name="time/new" />
-        <Stack.Screen name="document/preview" />
-        <Stack.Screen name="document/[id]" />
-        <Stack.Screen name="client/[id]" />
-        <Stack.Screen name="client/new" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="onboarding" options={{ presentation: 'modal' }} />
-      </Stack>
+      <AppLockGate>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: colors.background },
+          }}
+        >
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="document/new" />
+          <Stack.Screen name="document/ai" />
+          <Stack.Screen name="recurring/index" />
+          <Stack.Screen name="recurring/new" />
+          <Stack.Screen name="expense/new" />
+          <Stack.Screen name="expense/report" />
+          <Stack.Screen name="business/index" />
+          <Stack.Screen name="business/new" />
+          <Stack.Screen name="business/join" />
+          <Stack.Screen name="business/team" />
+          <Stack.Screen name="activity" />
+          <Stack.Screen name="projects/index" />
+          <Stack.Screen name="project/new" />
+          <Stack.Screen name="project/[id]" />
+          <Stack.Screen name="time/new" />
+          <Stack.Screen name="document/preview" />
+          <Stack.Screen name="document/[id]" />
+          <Stack.Screen name="client/[id]" />
+          <Stack.Screen name="client/new" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="onboarding" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="backup" />
+          <Stack.Screen name="privacy" />
+          <Stack.Screen name="account/delete" />
+        </Stack>
+      </AppLockGate>
     </>
   );
 }

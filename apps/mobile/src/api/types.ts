@@ -554,3 +554,24 @@ export interface ActivityPage {
   nextCursor: string | null;
   limit: number;
 }
+
+export interface BackupCounts {
+  clients: number;
+  projects: number;
+  documents: number;
+  expenses: number;
+  timeEntries: number;
+  savedItems: number;
+}
+
+export interface BackupPreview {
+  counts: BackupCounts;
+  existingDocuments: number;
+  exportedAt: string | null;
+}
+
+export interface RestoreResult {
+  restored: BackupCounts;
+  skipped: { documents: number; expenses: number; timeEntries: number; savedItems: number };
+  business: Business;
+}
