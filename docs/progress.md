@@ -449,13 +449,43 @@ file was shared, because no device is attached to this workspace.
 - [x] Free-tier capacity estimate from measured record sizes (≈ 1.7 KB per issued invoice, ≈ 0.4 KB
       per expense) in `docs/limits.md`, with the 100 ops/s and 500-connection ceilings noted
 - [x] `docs/hardening.md` records the audit, the measurements and every check that could not run
-- [x] 6 new API tests in `week15.test.ts`
+- [x] 8 new API tests in `week15.test.ts`
 
 **Done when:** no high or critical audit findings, every earlier acceptance test passes, and the app
 is usable on a slow phone with large text. What is verified: a 10.8 MB export, larger than one
-request may carry, restores completely through the app's splitter with no duplicates and one log row; `npm audit --audit-level=high` exits 0
-(three moderate `minimatch` advisories inside Expo's build tooling remain and are documented), all
-shared and API tests pass including the new volume, recurring-restore, ownership and rate-limit
-cases, and contrast is measured from the real tokens. What is **not** verified: slow-phone scrolling,
+request may carry, restores completely through the app's splitter with no duplicates and one log
+row; `npm audit --audit-level=high` exits 0 (three moderate `minimatch` advisories inside Expo's
+build tooling remain and are documented); all shared and API tests pass including the volume,
+recurring-restore, ownership and rate-limit cases; and contrast is measured from the real tokens. What is **not** verified: slow-phone scrolling,
 start-up and PDF render time, and large-text layout on a device — no phone or emulator is attached
 to this workspace. See `docs/hardening.md` for the full list.
+
+## M16 — Release (week 16) — prepared locally, nothing deployed
+
+**Goal:** a live app.
+
+- [x] Render Blueprint (`render.yaml`): native Node build, free plan, health check
+      `/api/v1/health`, and secrets marked `sync: false` so no value lives in git
+- [x] Netlify config (`netlify.toml`) and a root `npm run build:web` that exports the single-page web
+      build to `apps/mobile/dist`, with the SPA redirect and immutable asset caching
+- [x] EAS profiles (`apps/mobile/eas.json`) and release version fields: `1.0.0`, build 1,
+      `appVersionSource: local`
+- [x] Monitoring hooks: every response carries `x-request-id` (exposed to the web build) so a report
+      can be matched to the API log stream; the keep-warm cost trade-off is calculated in
+      `docs/release.md` and `docs/limits.md`
+- [x] `docs/release.md`: the runbook for Atlas, Render, Netlify, EAS, monitoring, backup, rollback,
+      the five-owner pilot and the release gate, plus every account, secret and authorization still
+      needed
+- [x] `docs/privacy-policy.md`: store-ready policy matching the app's real data handling (server
+      data, on-device data, Gemini, retention, export and deletion)
+- [x] `docs/store-listing.md`: Play and App Store copy, data-safety answers, the account-deletion URL
+      requirement, content rating and the screenshot shot list
+- [x] A health test for the request id; the whole suite stays green
+- [ ] Deploy the API and the web build — needs owner accounts and explicit authorization
+- [ ] Android (and iOS) release build — needs Expo and store accounts, including third-party fees
+- [ ] Five-owner pilot and the post-launch list — needs real users
+
+**Done when:** a stranger installs the app and sends a real invoice without help — **not met**:
+nothing is deployed, no store build exists and no phone is attached. Everything that can be done
+without accounts is in the repository; `docs/release.md` is the remaining sequence, and it opens
+with the list of what is blocked.

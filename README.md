@@ -125,6 +125,19 @@ npm run dev:mobile                             # then scan the QR code or press 
   per currency. Receipt photos stay on the phone; only the amount, date, category and note are
   stored.
 
+## Release
+
+The release artifacts live in the repository, but nothing is deployed:
+
+- `render.yaml` is a Render Blueprint for the API (health check `/api/v1/health`; secrets are
+  entered in the dashboard, never committed).
+- `netlify.toml` plus `npm run build:web` build and serve the Expo web export.
+- `apps/mobile/eas.json` holds the development, preview and production build profiles; `app.json`
+  is at version `1.0.0` with build number 1.
+- `docs/release.md` is the runbook and lists every account, secret and authorization still needed.
+  `docs/privacy-policy.md` and `docs/store-listing.md` hold the store text and data-safety answers;
+  `docs/phone-checklist.md` is the device test list.
+
 ## Rules this codebase follows
 
 - Money is an integer count of minor units; never floating point.

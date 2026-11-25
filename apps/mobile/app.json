@@ -2,7 +2,7 @@
   "expo": {
     "name": "Invoxa",
     "slug": "invoxa",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "scheme": "invoxa",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -10,10 +10,12 @@
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.invoxa.mobile"
+      "bundleIdentifier": "app.invoxa.mobile",
+      "buildNumber": "1"
     },
     "android": {
       "package": "app.invoxa.mobile",
+      "versionCode": 1,
       "edgeToEdgeEnabled": true
     },
     "web": {

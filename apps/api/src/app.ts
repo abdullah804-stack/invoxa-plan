@@ -40,8 +40,8 @@ export async function buildApp(config: ApiConfig): Promise<FastifyInstance> {
     origin: config.corsOrigins.length > 0 ? config.corsOrigins : false,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Business-Id', 'X-Timezone'],
-    // The web build reads this to wait the right time before retrying a part.
-    exposedHeaders: ['Retry-After'],
+    // The web build reads the retry window and quotes the request id in support.
+    exposedHeaders: ['Retry-After', 'X-Request-Id'],
     maxAge: 86_400,
   });
 
@@ -59,6 +59,12 @@ export async function buildApp(config: ApiConfig): Promise<FastifyInstance> {
         code: 'RATE_LIMITED',
         after: context.after,
       }),
+  });
+
+  // Every response carries its log correlation id, so a user can quote it when
+  // reporting a failure and the host's log stream can be searched for it.
+  app.addHook('onSend', async (request, reply) => {
+    reply.header('x-request-id', String(request.id));
   });
 
   // Operator injection: strip $ keys, dotted keys and prototype keys before

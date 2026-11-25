@@ -22,6 +22,12 @@ describe('health and the central error shape', () => {
     expect(response.body).toEqual({ status: 'ok', service: 'invoxa-api' });
   });
 
+  it('returns a request id so a report can be matched to the logs', async () => {
+    const response = await testApp.request().get('/api/v1/health');
+
+    expect(response.headers['x-request-id']).toBeTruthy();
+  });
+
   it('returns NOT_FOUND in the standard shape for an unknown route', async () => {
     const response = await testApp.request().get('/api/v1/nope');
 

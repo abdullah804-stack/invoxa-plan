@@ -54,8 +54,12 @@ development build in week 4 and reuse it; do not spend builds on cosmetic change
 - Sources: [instance types](https://render.com/docs/compute-plans),
   [free service limits](https://render.com/docs/free).
 
-**What this means for Invoxa:** the app shows "Waking the server" and a keep-warm ping can be
-added in week 16. Cold starts are a product concern, not just an ops detail.
+**What this means for Invoxa:** the app shows "Waking the server" and retries a backup part. A
+keep-warm ping is optional and not free in practice: a 10-minute GitHub Actions cron is about
+4,320 runs a month, billed at a minute each, which exceeds the free Actions allowance; an external
+5-minute monitor keeps the service awake but spends about 720 of the 750 free instance-hours. Cold
+starts are a product concern, not just an ops detail. The trade-off is written up in
+`docs/release.md`.
 
 ## Static host for the Expo web export (Netlify free)
 

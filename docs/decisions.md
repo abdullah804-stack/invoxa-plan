@@ -566,6 +566,37 @@ The activity log keeps the newest 250 entries per business, trimmed as new ones 
 usage rows carry a 30-day TTL index, so the counters vanish without a job. Both are described on the
 privacy screen, and issued documents are voided rather than deleted so numbers stay meaningful.
 
+## 25 November 2026 — Week 16
+
+### The web build is one page, the API is a native Node service
+
+`expo export --platform web` writes a single-page bundle, so `netlify.toml` serves `index.html` for
+every route and caches the hashed `_expo/static` files for a year. The API stays a Fastify service
+built from the repository root (`npm ci`, shared package, then TypeScript) and hosted on Render's
+free plan; no container image is introduced, because Render can run the Node build directly.
+
+### Keep-warm is a cost decision, not a switch
+
+Render sleeps a free service after 15 idle minutes. A GitHub Actions cron every 10 minutes would be
+about 4,320 runs a month, and Actions bills at least one minute per run — more than the included
+allowance. An external 5-minute monitor keeps the service awake but spends roughly 720 of the 750
+free instance-hours. So the default stays the app's "Waking the server" message (with retry where a
+request can be retried), and a ping is an owner decision documented in `docs/release.md`, not part
+of the code.
+
+### Release text lives next to the code it describes
+
+The privacy policy and store listing are in `docs/`, written from the app's actual behaviour: what
+the server stores, what stays on the phone, what Gemini receives, how long each thing is kept, and
+how to export or delete. Placeholders remain for the contact email, the public URL and the store
+account details, because publishing them needs the owner's identity and a hosted page.
+
+### Version numbers are local, not guessed
+
+`app.json` is at `1.0.0` with Android `versionCode: 1` and iOS `buildNumber: "1"`, and the EAS
+config uses `appVersionSource: local`. Every store upload must bump them deliberately, so a build
+number never changes under the project's feet.
+
 ## 25 November 2026 — Week 15
 
 ### A backup is complete, not a page
@@ -619,5 +650,6 @@ as well as on success, so no screen shows totals from before a partial import.
 ### Whole-business routes get their own limits
 
 `GET /backup`, `/backup/preview` and `/backup/restore` read or write an entire business and accept
-an 8 MB body, so they carry tighter limits (20 and 10 a minute) than the general 120. The general
-limit still protects every other route, and health stays exempt so a wake-up ping is never throttled.
+an 8 MB body, so they carry tighter limits (20 and 30 a minute) than the general 120. The restore
+limit is 30 because a large backup arrives as many parts. The general limit still protects every
+other route, and health stays exempt so a wake-up ping is never throttled.

@@ -1,0 +1,36 @@
+# Render Blueprint for the Invoxa API.
+#
+# Applying this file from the Render dashboard creates the service; nothing
+# deploys from the repository by itself. MONGODB_URI, CORS_ORIGINS and
+# GEMINI_API_KEY are marked `sync: false`, so Render asks for them and never
+# stores them in git.
+services:
+  - type: web
+    name: invoxa-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build:shared && npm run build --workspace @invoxa/api
+    startCommand: npm run start --workspace @invoxa/api
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Signing key for sessions and the job secret for /recurring/run.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JOB_SECRET
+        generateValue: true
+      # Mongo Atlas connection string, including the database name (invoxa).
+      - key: MONGODB_URI
+        sync: false
+      # The deployed web origin(s), comma separated, https only.
+      - key: CORS_ORIGINS
+        sync: false
+      # Optional: without it the AI screens say it is not set up.
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: AI_DAILY_LIMIT
+        value: '30'
