@@ -8,6 +8,7 @@ import {
   paymentMethodSchema,
   storedDocumentStatusSchema,
 } from './enums.js';
+import { recurringIntervalSchema } from './recurring.js';
 
 /**
  * The JSON backup: one file that holds a business's profile and its records in
@@ -17,6 +18,14 @@ import {
  */
 
 export const BACKUP_VERSION = 1;
+
+/**
+ * A sanity bound for one array, not a page size. The export reads every row a
+ * business has; this only stops a hand-made file from asking the server to loop
+ * an unreasonable number of times. It sits well above what the 8 MB restore
+ * body can carry, so a file this server exported always validates again.
+ */
+const MAX_ROWS = 20_000;
 
 const lineItemSchema = z.object({
   id: optionalText(64),
@@ -105,6 +114,36 @@ export const backupDocumentSchema = z.object({
   adjustments: z.array(adjustmentSchema).max(20).default([]),
 });
 
+/**
+ * One recurring schedule. It refers to the invoice it repeats by that
+ * document's device ID rather than by database ID, because a restored document
+ * gets a new database ID in the receiving business.
+ */
+export const backupRecurringSchema = z.object({
+  sourceClientUuid: optionalText(64),
+  clientSnapshot: clientSnapshotSchema.optional(),
+  items: z.array(lineItemSchema).max(500).default([]),
+  currency: currencySchema,
+  discount: z
+    .union([
+      z.object({ type: z.literal('percent'), valueBp: z.number().int().min(0).max(10000) }),
+      z.object({ type: z.literal('fixed'), valueMinor: minorUnitsSchema }),
+    ])
+    .nullable()
+    .optional(),
+  taxRateBp: z.number().int().min(0).max(10000).default(0),
+  taxMode: z.enum(['added', 'included']).default('added'),
+  notes: optionalText(2000),
+  terms: optionalText(2000),
+  interval: recurringIntervalSchema,
+  intervalCount: z.number().int().min(1).max(12).default(1),
+  startDate: isoDateSchema,
+  endDate: isoDateSchema.optional(),
+  nextRunAt: isoDateSchema,
+  dueDays: z.number().int().min(0).max(90).default(14),
+  active: z.boolean().default(true),
+});
+
 export const backupExpenseSchema = z.object({
   date: isoDateSchema,
   category: expenseCategorySchema,
@@ -144,13 +183,16 @@ export const backupSchema = z.object({
       signature: optionalText(2_000_000),
     })
     .optional(),
-  clients: z.array(backupClientSchema).max(2000).default([]),
-  projects: z.array(backupProjectSchema).max(500).default([]),
-  documents: z.array(backupDocumentSchema).max(2000).default([]),
-  expenses: z.array(backupExpenseSchema).max(2000).default([]),
-  timeEntries: z.array(backupTimeEntrySchema).max(2000).default([]),
-  savedItems: z.array(backupSavedItemSchema).max(1000).default([]),
+  clients: z.array(backupClientSchema).max(MAX_ROWS).default([]),
+  projects: z.array(backupProjectSchema).max(MAX_ROWS).default([]),
+  documents: z.array(backupDocumentSchema).max(MAX_ROWS).default([]),
+  expenses: z.array(backupExpenseSchema).max(MAX_ROWS).default([]),
+  timeEntries: z.array(backupTimeEntrySchema).max(MAX_ROWS).default([]),
+  savedItems: z.array(backupSavedItemSchema).max(MAX_ROWS).default([]),
+  /** New in week 15; an older file without this key restores as no schedules. */
+  recurring: z.array(backupRecurringSchema).max(2000).default([]),
 });
 
 export type BackupFile = z.infer<typeof backupSchema>;
 export type BackupDocument = z.infer<typeof backupDocumentSchema>;
+export type BackupRecurring = z.infer<typeof backupRecurringSchema>;

@@ -565,3 +565,38 @@ business the user owns, so nobody loses access to a shared workspace by someone 
 The activity log keeps the newest 250 entries per business, trimmed as new ones arrive. AI daily
 usage rows carry a 30-day TTL index, so the counters vanish without a job. Both are described on the
 privacy screen, and issued documents are voided rather than deleted so numbers stay meaningful.
+
+## 25 November 2026 — Week 15
+
+### A backup is complete, not a page
+
+The export used to pass a 2,000-row limit to `find()` and say nothing about it, so a business with
+more records silently lost the rest, and recurring schedules were not in the file at all. Export and
+restore now walk each collection in 500-row `_id` order until it is exhausted. A schedule is stored
+with its source invoice's device ID (`clientUuid`) rather than its database ID, so a restore into a
+fresh business can point the schedule at the copied invoice. Restore merges schedules by source
+document, start date and interval, and an active restored schedule resumes at today: the missed
+months are already in the file as ordinary drafts, so backfilling would duplicate them. A schedule
+whose source invoice is not in the file is counted as skipped instead of being attached to a guess.
+
+Array maxima in the shared schema were raised from 2,000 to 20,000 for this reason: they are a
+sanity bound against a hand-made file, not a page size. The 8 MB restore body still binds first, so
+any file this server writes can be read back. Team members, invites and the activity log remain out
+of the file on purpose — they belong to people and the audit trail, not to billing records — and the
+Backup screen now says so.
+
+### Hardening is measured, not asserted
+
+Week 15 records numbers instead of adjectives: the dependency audit result, the contrast ratio of
+every palette pair (lowest 5.29:1), and the stored size of a realistic invoice (≈ 1.7 KB) and
+expense (≈ 0.4 KB), which produce the capacity estimate in `docs/limits.md`. Moderate
+`minimatch` advisories inside Expo's build tooling are accepted with a reason, because the only
+offer is a forced downgrade of Expo from 58 to 52. Anything that needs a phone — scrolling, cold
+start, PDF time, 200% font layout — is listed as unverified in `docs/hardening.md` rather than
+claimed.
+
+### Whole-business routes get their own limits
+
+`GET /backup`, `/backup/preview` and `/backup/restore` read or write an entire business and accept
+an 8 MB body, so they carry tighter limits (20 and 10 a minute) than the general 120. The general
+limit still protects every other route, and health stays exempt so a wake-up ping is never throttled.

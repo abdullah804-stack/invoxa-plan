@@ -1,7 +1,7 @@
 import { can } from '@invoxa/shared';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -25,7 +25,7 @@ import { useSession } from '../../src/auth/SessionProvider';
 import { errorMessage } from '../../src/lib/errors';
 import { radius, spacing, typeScale } from '../../src/theme/tokens';
 import { useTheme } from '../../src/theme/ThemeProvider';
-import type { DocumentListParams } from '../../src/api/types';
+import type { DocumentListParams, DocumentRecord } from '../../src/api/types';
 
 type DocType = 'invoice' | 'estimate' | 'credit_note';
 type StatusFilter = 'all' | 'draft' | 'sent' | 'partial' | 'overdue' | 'paid' | 'void';
@@ -103,18 +103,36 @@ export default function InvoicesScreen() {
   const canCreate = activeRole ? can(activeRole, 'drafts:create') : false;
   const canUseAi = activeRole ? can(activeRole, 'ai:use') : false;
 
-  const showNotice = (message: string) => {
+  const showNotice = useCallback((message: string) => {
     setNotice(message);
     if (noticeTimer.current) clearTimeout(noticeTimer.current);
     noticeTimer.current = setTimeout(() => setNotice(null), 2600);
-  };
+  }, []);
 
-  const onDuplicate = (id: string) => {
-    duplicate.mutate(id, {
-      onSuccess: () => showNotice('Draft copied. Find it under Draft.'),
-      onError: (error) => showNotice(errorMessage(error)),
-    });
-  };
+  const onDuplicate = useCallback(
+    (id: string) => {
+      duplicate.mutate(id, {
+        onSuccess: () => showNotice('Draft copied. Find it under Draft.'),
+        onError: (error) => showNotice(errorMessage(error)),
+      });
+    },
+    [duplicate, showNotice],
+  );
+
+  /** A stable row renderer keeps scrolling smooth: rows are memoised and only
+   * re-render when their own document changes, not on every keystroke. */
+  const renderItem = useCallback(
+    ({ item }: { item: DocumentRecord }) => (
+      <SwipeRow
+        actionLabel="Duplicate"
+        onAction={() => onDuplicate(item.id)}
+        disabled={!canDuplicate}
+      >
+        <DocumentRow document={item} onPress={() => router.push(`/document/${item.id}`)} />
+      </SwipeRow>
+    ),
+    [canDuplicate, onDuplicate, router],
+  );
 
   const cycleSort = () => {
     const index = SORT_ORDER.indexOf(sort);
@@ -233,6 +251,9 @@ export default function InvoicesScreen() {
           }
           onEndReached={nextPage}
           onEndReachedThreshold={0.4}
+          initialNumToRender={12}
+          maxToRenderPerBatch={16}
+          windowSize={9}
           ListEmptyComponent={
             <EmptyState
               title={
@@ -263,15 +284,7 @@ export default function InvoicesScreen() {
               </View>
             ) : undefined
           }
-          renderItem={({ item }) => (
-            <SwipeRow
-              actionLabel="Duplicate"
-              onAction={() => onDuplicate(item.id)}
-              disabled={!canDuplicate}
-            >
-              <DocumentRow document={item} onPress={() => router.push(`/document/${item.id}`)} />
-            </SwipeRow>
-          )}
+          renderItem={renderItem}
         />
       )}
     </Screen>

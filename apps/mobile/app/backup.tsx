@@ -22,6 +22,7 @@ function summary(counts: {
   expenses: number;
   timeEntries: number;
   savedItems: number;
+  recurring: number;
 }): string {
   return [
     `${counts.clients} clients`,
@@ -30,6 +31,7 @@ function summary(counts: {
     `${counts.projects} projects`,
     `${counts.timeEntries} time entries`,
     `${counts.savedItems} saved items`,
+    `${counts.recurring} recurring schedules`,
   ].join(' · ');
 }
 
@@ -152,9 +154,11 @@ export default function BackupScreen() {
         </View>
 
         <Text style={[styles.hint, { color: colors.textMuted }]}>
-          A backup covers the active business: its profile and brand, clients, projects, documents
-          with payments, expenses, tracked time and saved items. The file is plain JSON, so keep it
-          somewhere private.
+          A backup is the complete active business: its profile and brand, every client, project,
+          document with payments, recurring schedule, expense, tracked time entry and saved item. No
+          record is left out. Team members, invites and the activity log are not in the file,
+          because they belong to people rather than to the billing records. The file is plain JSON,
+          so keep it somewhere private.
         </Text>
 
         <Card style={styles.card}>
@@ -209,7 +213,8 @@ export default function BackupScreen() {
               </Text>
               <Text style={[styles.hint, { color: colors.textMuted }]}>
                 Kept what was already here: {result.skipped.documents} documents,{' '}
-                {result.skipped.expenses} expenses, {result.skipped.timeEntries} time entries.
+                {result.skipped.expenses} expenses, {result.skipped.timeEntries} time entries,{' '}
+                {result.skipped.recurring} recurring schedules.
               </Text>
             </View>
           ) : null}

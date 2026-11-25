@@ -1,11 +1,16 @@
 import { formatDate, formatMoney } from '@invoxa/shared';
+import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { DocumentRecord } from '../api/types';
 import { spacing, typeScale } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeProvider';
 import { StatusPill } from './StatusPill';
 
-export function DocumentRow({
+/**
+ * Memoised because an invoice list re-renders on every search keystroke and
+ * every page append; a row only changes when its own record does.
+ */
+export const DocumentRow = memo(function DocumentRow({
   document,
   onPress,
 }: {
@@ -51,14 +56,16 @@ export function DocumentRow({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${document.number ?? 'Draft'} for ${document.clientName ?? 'no client'}`}
+      accessibilityLabel={`${document.number ?? 'Draft'} for ${
+        document.clientName ?? 'no client'
+      }, ${formatMoney(document.totals.total, document.currency)}, ${document.shownStatus}`}
       onPress={onPress}
       style={({ pressed }) => (pressed ? styles.pressed : null)}
     >
       {row}
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   row: {

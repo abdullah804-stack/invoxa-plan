@@ -412,3 +412,41 @@ account removes everything it solely owned — verified against the API with a r
 restored invoice keeps its exact totals and paid amount, and after account deletion no user,
 business, client or document remains. No screen was clicked, no biometric prompt was shown and no
 file was shared, because no device is attached to this workspace.
+
+## M15 — Hardening (week 15) — built, device checks pending
+
+**Goal:** a release candidate.
+
+- [x] Backup completeness (week-14 follow-up): the export reads every row of every collection in
+      `_id` order instead of stopping at 2,000, includes recurring schedules (referenced by device
+      ID so a restore can find the copied invoice), and reports any schedule whose source document
+      is not in the file instead of guessing. Restore recognises existing rows past the first 2,000
+      too, and a restored schedule resumes at today rather than backfilling months that are already
+      in the file as documents
+- [x] Backup files without a client snapshot no longer contain `clientName: null`, which the
+      shared schema refuses; a document with no client now exports cleanly
+- [x] Security pass: scoped-helper audit, per-route rate limits (new: 20/min export, 10/min
+      preview and restore), upload checks, log redaction, secret handling, dependency audit
+- [x] Ownership matrix for every resource, including weeks 8–14: clients, invoices, expenses,
+      projects, time entries, saved items, recurring schedules, activity, reminders, backup and
+      members all answer 404 across businesses, on read and on write
+- [x] Rate-limit behaviour proved by test: a third sign-in attempt inside the window is `429`
+- [x] Accessibility: buttons wrap at large text instead of truncating, document rows read number,
+      client, amount and status to a screen reader, and every palette pair measures at least
+      5.29:1 contrast in both themes
+- [x] Performance work: memoised rows, a stable list renderer and bounded `FlatList` batches; the
+      export walks collections in 500-row batches
+- [x] Error-path review: server asleep, offline, expired token, offline at issue, AI down, quota,
+      validation, payload size and rate limits each have a defined message
+- [x] Free-tier capacity estimate from measured record sizes (≈ 1.7 KB per issued invoice, ≈ 0.4 KB
+      per expense) in `docs/limits.md`, with the 100 ops/s and 500-connection ceilings noted
+- [x] `docs/hardening.md` records the audit, the measurements and every check that could not run
+- [x] 6 new API tests in `week15.test.ts`
+
+**Done when:** no high or critical audit findings, every earlier acceptance test passes, and the app
+is usable on a slow phone with large text. What is verified: `npm audit --audit-level=high` exits 0
+(three moderate `minimatch` advisories inside Expo's build tooling remain and are documented), all
+shared and API tests pass including the new volume, recurring-restore, ownership and rate-limit
+cases, and contrast is measured from the real tokens. What is **not** verified: slow-phone scrolling,
+start-up and PDF render time, and large-text layout on a device — no phone or emulator is attached
+to this workspace. See `docs/hardening.md` for the full list.

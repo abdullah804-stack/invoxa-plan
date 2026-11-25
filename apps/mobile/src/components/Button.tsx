@@ -71,7 +71,9 @@ export function Button({
       {loading ? (
         <ActivityIndicator color={textColor} />
       ) : (
-        <Text style={[styles.label, { color: textColor }]} numberOfLines={1}>
+        // Two lines so a large accessibility font size wraps instead of cutting
+        // the action's name off.
+        <Text style={[styles.label, { color: textColor }]} numberOfLines={2}>
           {title}
         </Text>
       )}
@@ -86,6 +88,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
     borderWidth: 1,
   },
   label: {

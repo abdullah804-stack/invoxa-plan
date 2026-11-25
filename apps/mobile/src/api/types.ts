@@ -562,6 +562,7 @@ export interface BackupCounts {
   expenses: number;
   timeEntries: number;
   savedItems: number;
+  recurring: number;
 }
 
 export interface BackupPreview {
@@ -572,6 +573,12 @@ export interface BackupPreview {
 
 export interface RestoreResult {
   restored: BackupCounts;
-  skipped: { documents: number; expenses: number; timeEntries: number; savedItems: number };
+  skipped: {
+    documents: number;
+    expenses: number;
+    timeEntries: number;
+    savedItems: number;
+    recurring: number;
+  };
   business: Business;
 }

@@ -81,6 +81,40 @@ added in week 16. Cold starts are a product concern, not just an ops detail.
 Keep the pipeline short. The daily recurring job must be idempotent because a delayed or
 dropped cron run is normal, and `POST /recurring/run` is also called on app open.
 
+## Capacity: how many businesses fit in 512 MB
+
+Measured on **25 November 2026** against a local database, with `Buffer.byteLength` on stored
+records (a close proxy for BSON; indexes are not included in that figure):
+
+- one issued invoice with 5 lines, a client snapshot, totals and a brand snapshot: **≈ 1,663 bytes**
+- one expense with vendor and tax: **≈ 362 bytes**
+
+Assume one active small business for one year:
+
+| Records                                    | Count | Size         |
+| ------------------------------------------ | ----- | ------------ |
+| issued invoices (1.7 KB each)              | 250   | ≈ 425 KB     |
+| expenses (0.36 KB each)                    | 300   | ≈ 108 KB     |
+| time entries (0.3 KB each)                 | 400   | ≈ 120 KB     |
+| clients (0.25 KB each)                     | 80    | ≈ 20 KB      |
+| projects (0.4 KB each)                     | 20    | ≈ 8 KB       |
+| recurring schedules (0.6 KB each)          | 24    | ≈ 15 KB      |
+| activity log (capped at 250, 0.25 KB each) | 250   | ≈ 63 KB      |
+| profile, logo and signature (stored once)  | 1     | ≈ 60 KB      |
+| **records per business-year**              |       | **≈ 0.8 MB** |
+
+Indexes roughly double the footprint of small documents (the document collection alone carries five
+indexes), so budget **≈ 1.5–1.6 MB per business-year** of records. With 25% headroom left for
+operations and growth, 512 MB holds roughly:
+
+- **≈ 250–300 businesses** keeping one year of records, or
+- **≈ 120–150 businesses** keeping two years, or fewer if every logo is near its 300 KB cap.
+
+The 512 MB ceiling is data plus indexes; a free cluster is also limited to about 100 operations per
+second and 500 connections, which will bind sooner than storage once a few hundred users are
+active. The plan's mitigations still hold: one copy of each logo, a capped activity log, no receipt
+photos on the server, and a 30-day TTL on AI usage.
+
 ## Not verified
 
 - Gemini's exact active RPM/RPD for a specific project (varies; read it in AI Studio).
