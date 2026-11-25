@@ -259,6 +259,19 @@ describe('week 15: hardening', () => {
     // A 10 MB export and two restores need more than the default 30 s on CI.
   }, 120_000);
 
+  it('accepts more than ten restore parts a minute', async () => {
+    // A large backup arrives as many parts. Ten a minute used to fail a real
+    // restore, so twelve small parts must all be accepted in one window.
+    for (let index = 0; index < 12; index += 1) {
+      const response = await testApp
+        .request()
+        .post('/api/v1/backup/restore')
+        .set(headersFor(owner))
+        .send({ version: 1, part: { index: 1, total: 1 } });
+      expect(response.status, `part ${index + 1}`).toBe(200);
+    }
+  });
+
   it('answers 404, never 403, for another business resource on every later route', async () => {
     const client = await testApp
       .request()

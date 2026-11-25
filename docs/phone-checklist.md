@@ -181,6 +181,10 @@ correctly.
 - [ ] Restore into an empty second business; it completes and the invoice count matches the file.
 - [ ] Restore the same file again: every record is reported as kept, nothing is duplicated.
 - [ ] Kill the app mid-restore and restore again: the merge finishes without duplicating.
+- [ ] Turn airplane mode on for 15 seconds during the restore, then off: the retry finishes the
+      restore instead of leaving it half-done.
+- [ ] Force the server to rate-limit the restore (a bulk import plus a restore in the same minute):
+      the app waits and continues instead of failing.
 
 **Passes when:** the app is usable on a slow phone with the largest text size, every error path says
 what happened, and a file larger than the request limit restores completely.

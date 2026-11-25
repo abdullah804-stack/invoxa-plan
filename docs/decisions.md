@@ -608,6 +608,14 @@ being cut in half. Each part carries a `part: { index, total }` marker, which th
 route validates the marker and logs one activity row only on the last part, so a large restore does
 not fill the log with one row per request.
 
+Parts are also retried. The backup routes allow 30 parts a minute rather than 10, because ten was
+less than a real large restore needs; and the app retries a part up to six times when the server
+answers 429, 502–504, or the request times out or cannot connect. It waits for the `retry-after`
+the rate limiter sends, then backs off exponentially. Sending a part twice is harmless because
+restore merges, which is what makes retrying safe at all. If a restore still stops part-way, the
+error says how many parts were kept and to run Restore again; the query cache is cleared on failure
+as well as on success, so no screen shows totals from before a partial import.
+
 ### Whole-business routes get their own limits
 
 `GET /backup`, `/backup/preview` and `/backup/restore` read or write an entire business and accept

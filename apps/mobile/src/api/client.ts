@@ -21,13 +21,22 @@ export class ApiError extends Error {
   readonly code: string;
   readonly status: number;
   readonly details: ApiFieldError[];
+  /** Seconds until a rate-limited request may be sent again, when the server says so. */
+  readonly retryAfterSeconds: number | null;
 
-  constructor(message: string, code: string, status: number, details: ApiFieldError[] = []) {
+  constructor(
+    message: string,
+    code: string,
+    status: number,
+    details: ApiFieldError[] = [],
+    retryAfterSeconds: number | null = null,
+  ) {
     super(message);
     this.name = 'ApiError';
     this.code = code;
     this.status = status;
     this.details = details;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 
   /** Field errors keyed by path, ready for inline form messages. */
@@ -139,11 +148,13 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   if (!response.ok) {
     const parsed = payload as ApiErrorBody | null;
+    const retryAfter = Number.parseInt(response.headers.get('retry-after') ?? '', 10);
     throw new ApiError(
       parsed?.error?.message ?? 'Something went wrong. Try again.',
       parsed?.error?.code ?? 'UNKNOWN',
       response.status,
       parsed?.error?.details ?? [],
+      Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : null,
     );
   }
 

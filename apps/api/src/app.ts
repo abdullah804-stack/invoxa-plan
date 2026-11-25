@@ -40,6 +40,8 @@ export async function buildApp(config: ApiConfig): Promise<FastifyInstance> {
     origin: config.corsOrigins.length > 0 ? config.corsOrigins : false,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Business-Id', 'X-Timezone'],
+    // The web build reads this to wait the right time before retrying a part.
+    exposedHeaders: ['Retry-After'],
     maxAge: 86_400,
   });
 

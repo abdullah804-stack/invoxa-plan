@@ -430,6 +430,9 @@ file was shared, because no device is attached to this workspace.
       stays idempotent, and a multi-part restore writes one activity row
 - [x] `docs/phone-checklist.md` lists every device check weeks 4–15 could not run, with the expected
       result for each and a fixture path for the large-restore case
+- [x] Large restores survive the rate limit: the backup routes allow 30 parts a minute (up from 10),
+      and the app retries a part on 429, 502–504, network or timeout, honouring `retry-after`; a
+      restore that still stops says what was kept, and the query cache is cleared on failure too
 - [x] Security pass: scoped-helper audit, per-route rate limits (new: 20/min export, 10/min
       preview and restore), upload checks, log redaction, secret handling, dependency audit
 - [x] Ownership matrix for every resource, including weeks 8–14: clients, invoices, expenses,

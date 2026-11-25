@@ -40,7 +40,12 @@ const BACKUP_BODY_LIMIT = 8 * 1024 * 1024;
 const SCAN_BATCH = 500;
 /** Copying a whole business is heavier than a normal request, so it is capped lower. */
 const BACKUP_EXPORT_LIMIT = { max: 20, timeWindow: '1 minute' };
-const BACKUP_RESTORE_LIMIT = { max: 10, timeWindow: '1 minute' };
+/**
+ * A large backup arrives as many <=6 MB parts, so ten a minute would throttle a
+ * real restore. Thirty leaves room for a 512 MB business (about 85 parts) in a
+ * few minutes, and the client retries on the `retry-after` when it still waits.
+ */
+const BACKUP_RESTORE_LIMIT = { max: 30, timeWindow: '1 minute' };
 
 /**
  * The app marks each upload with its part number, so a restore sent in parts

@@ -37,8 +37,10 @@ read.
 - Global 120 requests a minute per user or IP; health is exempt so a wake-up ping cannot be
   throttled away.
 - 10 a minute per IP on register and login, 5 a minute on each AI route.
-- New this week: 20 a minute for `GET /backup`, 10 a minute for `/backup/preview` and
-  `/backup/restore`, because those three read or write a whole business and accept an 8 MB body.
+- New this week: 20 a minute for `GET /backup`, 30 a minute for `/backup/preview` and
+  `/backup/restore`, because those three read or write a whole business and accept an 8 MB body. The
+  restore limit is 30, not 10, because a large backup arrives as many parts; the app also retries a
+  part after `retry-after`, so the limit delays a restore instead of failing it.
 - Verified by test: a third sign-in attempt inside the window gets `429 RATE_LIMITED`.
 
 ### Uploads and sizes
@@ -126,17 +128,18 @@ phone. Those need hardware and are the main open item for this milestone.
 
 ## 5. Error paths
 
-| Situation                 | What the user sees                                                                                |
-| ------------------------- | ------------------------------------------------------------------------------------------------- |
-| Server asleep (Render)    | Aborts at 25 s with "The server is taking a while to wake up. Try again."                         |
-| No connection / offline   | "Cannot reach the server. Check your connection and try again."                                   |
-| Expired or revoked token  | One 401 handler clears the session and returns to sign-in                                         |
-| Offline while issuing     | The issue call fails with the network message; the draft stays unsaved locally and can be retried |
-| AI key missing or AI down | `AI_FAILED` with a plain message; the manual editor is still offered                              |
-| AI daily cap reached      | `AI_QUOTA` with the remaining count at zero and tomorrow's reset                                  |
-| Validation failure        | Per-field messages from the same Zod schema the form used                                         |
-| Payload too large         | `413 PAYLOAD_TOO_LARGE`, "That request is too large"                                              |
-| Rate limited              | `429 RATE_LIMITED`, "Too many requests. Try again soon."                                          |
+| Situation                 | What the user sees                                                                                                                  |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Server asleep (Render)    | Aborts at 25 s with "The server is taking a while to wake up. Try again."                                                           |
+| No connection / offline   | "Cannot reach the server. Check your connection and try again."                                                                     |
+| Expired or revoked token  | One 401 handler clears the session and returns to sign-in                                                                           |
+| Offline while issuing     | The issue call fails with the network message; the draft stays unsaved locally and can be retried                                   |
+| AI key missing or AI down | `AI_FAILED` with a plain message; the manual editor is still offered                                                                |
+| AI daily cap reached      | `AI_QUOTA` with the remaining count at zero and tomorrow's reset                                                                    |
+| Validation failure        | Per-field messages from the same Zod schema the form used                                                                           |
+| Payload too large         | `413 PAYLOAD_TOO_LARGE`, "That request is too large"                                                                                |
+| Rate limited              | `429 RATE_LIMITED`, "Too many requests. Try again soon."                                                                            |
+| Rate limited mid-restore  | That part waits for `retry-after` and is sent again (up to six tries); if it still stops, the message says how many parts were kept |
 
 No new code was needed here; the review confirmed each path exists. They are checked by unit/API
 tests where the server produces them, and by inspection on the client.

@@ -1,6 +1,7 @@
-import { splitBackupForUpload } from '@invoxa/shared';
+import { retryAsync, splitBackupForUpload } from '@invoxa/shared';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from '../auth/SessionProvider';
+import { ApiError } from './client';
 import {
   acceptInvite,
   applyLateFee,
@@ -220,6 +221,37 @@ function addCounts(target: BackupCounts, source: BackupCounts): void {
   for (const key of BACKUP_COUNT_KEYS) target[key] += source[key];
 }
 
+const BACKUP_PART_ATTEMPTS = 6;
+
+/**
+ * A backup part is safe to send twice: restore merges and preview only reads.
+ * A rate-limit window or a sleeping/failing server therefore delays a large
+ * restore instead of aborting it. Validation and permission errors are final.
+ */
+function shouldRetryBackupPart(error: unknown): boolean {
+  if (!(error instanceof ApiError)) return false;
+  if (error.code === 'RATE_LIMITED' || error.code === 'NETWORK' || error.code === 'TIMEOUT') {
+    return true;
+  }
+  return error.status === 502 || error.status === 503 || error.status === 504;
+}
+
+function backupPartDelay(error: unknown, attempt: number): number {
+  // The rate limiter says how long its window has left; otherwise back off.
+  if (error instanceof ApiError && error.retryAfterSeconds) {
+    return Math.min(error.retryAfterSeconds * 1000, 60_000);
+  }
+  return Math.min(2_000 * 2 ** attempt, 30_000);
+}
+
+function sendBackupPart<T>(send: () => Promise<T>): Promise<T> {
+  return retryAsync(send, {
+    attempts: BACKUP_PART_ATTEMPTS,
+    shouldRetry: shouldRetryBackupPart,
+    delayMs: backupPartDelay,
+  });
+}
+
 /**
  * A file can be larger than the restore route's body limit, so both calls split
  * it into parts and add up what each part reports. Same file, same merge rules.
@@ -232,7 +264,7 @@ export function usePreviewBackup() {
       let exportedAt: string | null = null;
 
       for (const part of splitBackupForUpload(file)) {
-        const preview = await previewBackup(part);
+        const preview = await sendBackupPart(() => previewBackup(part));
         addCounts(counts, preview.counts);
         existingDocuments += preview.existingDocuments;
         exportedAt = exportedAt ?? preview.exportedAt;
@@ -250,16 +282,29 @@ export function useRestoreBackup() {
       const restored = emptyCounts();
       const skipped = { documents: 0, expenses: 0, timeEntries: 0, savedItems: 0, recurring: 0 };
       let business: RestoreResult['business'] | null = null;
+      const parts = splitBackupForUpload(file);
+      let completed = 0;
 
-      for (const part of splitBackupForUpload(file)) {
-        const result = await restoreBackup(part);
-        addCounts(restored, result.restored);
-        skipped.documents += result.skipped.documents;
-        skipped.expenses += result.skipped.expenses;
-        skipped.timeEntries += result.skipped.timeEntries;
-        skipped.savedItems += result.skipped.savedItems;
-        skipped.recurring += result.skipped.recurring;
-        business = result.business;
+      try {
+        for (const part of parts) {
+          const result = await sendBackupPart(() => restoreBackup(part));
+          addCounts(restored, result.restored);
+          skipped.documents += result.skipped.documents;
+          skipped.expenses += result.skipped.expenses;
+          skipped.timeEntries += result.skipped.timeEntries;
+          skipped.savedItems += result.skipped.savedItems;
+          skipped.recurring += result.skipped.recurring;
+          business = result.business;
+          completed += 1;
+        }
+      } catch (error) {
+        if (completed === 0 || !(error instanceof Error)) throw error;
+        // The earlier parts were written and are kept, so say what to do next
+        // instead of implying the whole restore was undone.
+        throw new Error(
+          `${error.message} Restore stopped after ${completed} of ${parts.length} parts. ` +
+            'What was already added is kept, so run Restore again to finish.',
+        );
       }
 
       if (!business) {
@@ -267,8 +312,9 @@ export function useRestoreBackup() {
       }
       return { restored, skipped, business };
     },
-    onSuccess: () => {
-      // A restore can change every number on every screen.
+    onSettled: () => {
+      // A restore that stopped part-way still wrote records, so no cached
+      // number is trustworthy after success or failure.
       queryClient.clear();
     },
   });
