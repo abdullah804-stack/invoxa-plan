@@ -99,7 +99,11 @@ export default function ReportsScreen() {
             <FilterChip
               key={option}
               label={
-                option === 'month' ? 'This month' : option === 'quarter' ? 'This quarter' : 'This year'
+                option === 'month'
+                  ? 'This month'
+                  : option === 'quarter'
+                    ? 'This quarter'
+                    : 'This year'
               }
               selected={preset === option}
               onPress={() => setPreset(option)}

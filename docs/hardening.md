@@ -133,7 +133,7 @@ phone. Those need hardware and are the main open item for this milestone.
 | Server asleep (Render)    | Aborts at 25 s with "The server is taking a while to wake up. Try again."                                                           |
 | No connection / offline   | "Cannot reach the server. Check your connection and try again."                                                                     |
 | Expired or revoked token  | One 401 handler clears the session and returns to sign-in                                                                           |
-| Offline while issuing     | The issue call fails with the network message; the draft is unchanged on the server and can be retried when the connection is back |
+| Offline while issuing     | The issue call fails with the network message; the draft is unchanged on the server and can be retried when the connection is back  |
 | AI key missing or AI down | `AI_FAILED` with a plain message; the manual editor is still offered                                                                |
 | AI daily cap reached      | `AI_QUOTA` with the remaining count at zero and tomorrow's reset                                                                    |
 | Validation failure        | Per-field messages from the same Zod schema the form used                                                                           |

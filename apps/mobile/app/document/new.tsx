@@ -441,7 +441,11 @@ export default function DocumentEditorScreen() {
     setNotice(null);
     const body = buildPayload();
     if (!body) return;
-    const clientUuid = newClientUuid();
+    // An edit must keep the draft's device ID: sync finds it by that ID, so a
+    // fresh one would be stored as a second document instead of an update.
+    const clientUuid = editingId
+      ? (existing.data?.document.clientUuid ?? newClientUuid())
+      : newClientUuid();
     try {
       const result = editingId
         ? await updateDocument.mutateAsync({ id: editingId, input: body })
