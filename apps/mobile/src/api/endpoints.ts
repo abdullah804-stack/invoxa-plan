@@ -627,6 +627,7 @@ export function fetchExpensesCsv(
 export function syncInvoices(
   invoices: Array<{
     baseUpdatedAt?: string | null;
+    resolution?: 'keep-mine';
     document: DocumentDraftBody & {
       clientUuid: string;
       docType: 'invoice' | 'estimate' | 'credit_note';

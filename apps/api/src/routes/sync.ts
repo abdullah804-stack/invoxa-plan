@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { FastifyPluginAsync } from 'fastify';
 import { Types } from 'mongoose';
 import { syncInvoicesRequestSchema, type DocumentInput } from '@invoxa/shared';
@@ -83,6 +84,11 @@ function draftFields(input: DocumentInput) {
  * back. `clientUuid` makes a retry a no-op and `baseUpdatedAt` turns a server
  * change into a conflict instead of a silent overwrite. One bad item never
  * rejects the others: every item gets its own result.
+ *
+ * A conflict is answered, not dropped: `resolution: 'keep-mine'` is the user
+ * saying "keep the phone copy". It writes over the server draft, or — when the
+ * document was already issued and must never change — carries the phone copy into
+ * a new draft with a fresh clientUuid.
  */
 export const syncRoutes: FastifyPluginAsync<SyncRouteOptions> = async (app, { config }) => {
   const authenticateRequest = authenticate(config);
@@ -98,79 +104,42 @@ export const syncRoutes: FastifyPluginAsync<SyncRouteOptions> = async (app, { co
 
     for (const item of body.invoices) {
       const input = item.document;
+      const keepMine = item.resolution === 'keep-mine';
       try {
         const existing = await documents.findOne({ clientUuid: input.clientUuid });
 
-        if (existing) {
-          if (existing.docType !== input.docType) {
-            results.push({
-              status: 'failed',
-              clientUuid: input.clientUuid,
-              message: 'A draft with that device ID already exists as another type',
-            });
-            continue;
-          }
-          if (existing.status !== 'draft') {
-            results.push({
-              status: 'conflict',
-              clientUuid: input.clientUuid,
-              message: 'This draft was already issued. Keep both and edit the new one.',
-              document: serializeDocument(existing, today),
-            });
-            continue;
-          }
+        if (existing && existing.docType !== input.docType) {
+          results.push({
+            status: 'failed',
+            clientUuid: input.clientUuid,
+            message: 'A draft with that device ID already exists as another type',
+          });
+          continue;
+        }
+
+        // An issued document is history. The phone copy is kept as a new draft
+        // instead, so nothing is thrown away and nothing is rewritten.
+        if (existing && existing.status !== 'draft' && !keepMine) {
+          results.push({
+            status: 'conflict',
+            clientUuid: input.clientUuid,
+            message:
+              'This draft was already issued on another device. Keep the phone copy to save it as a new draft.',
+            document: serializeDocument(existing, today),
+          });
+          continue;
+        }
+
+        if (existing && existing.status === 'draft' && !keepMine) {
           if (hasConflict(existing, item.baseUpdatedAt)) {
             results.push({
               status: 'conflict',
               clientUuid: input.clientUuid,
-              message: 'This draft changed on another device. Keep both and edit the new one.',
+              message: 'This draft changed on another device since you opened it here.',
               document: serializeDocument(existing, today),
             });
             continue;
           }
-
-          const fields = draftFields(input);
-          existing.items = fields.items as typeof existing.items;
-          existing.currency = input.currency;
-          existing.discount = fields.discount as typeof existing.discount;
-          existing.taxRateBp = fields.taxRateBp;
-          existing.taxMode = fields.taxMode;
-          existing.issueDate = fields.issueDate;
-          existing.dueDate = fields.dueDate;
-          existing.validUntil = fields.validUntil;
-          existing.reference = fields.reference;
-          existing.notes = fields.notes;
-          existing.terms = fields.terms;
-          existing.projectId = fields.projectId as typeof existing.projectId;
-
-          const client = input.clientId
-            ? Types.ObjectId.isValid(input.clientId)
-              ? await scoped(Client, context).findById(input.clientId)
-              : null
-            : null;
-          if (input.clientId && !client) {
-            results.push({
-              status: 'failed',
-              clientUuid: input.clientUuid,
-              message: 'That client could not be found',
-            });
-            continue;
-          }
-          if (client) {
-            existing.clientId = client._id;
-            existing.clientSnapshot = buildClientSnapshot(client) as typeof existing.clientSnapshot;
-          } else if (input.clientSnapshot) {
-            existing.clientSnapshot = input.clientSnapshot as typeof existing.clientSnapshot;
-          }
-
-          applyTotals(existing);
-          await existing.save();
-          results.push({
-            status: 'updated',
-            clientUuid: input.clientUuid,
-            document: serializeDocument(existing, today),
-          });
-          continue;
         }
 
         const client = input.clientId
@@ -188,8 +157,40 @@ export const syncRoutes: FastifyPluginAsync<SyncRouteOptions> = async (app, { co
         }
 
         const fields = draftFields(input);
+
+        if (existing && existing.status === 'draft') {
+          existing.items = fields.items as typeof existing.items;
+          existing.currency = input.currency;
+          existing.discount = fields.discount as typeof existing.discount;
+          existing.taxRateBp = fields.taxRateBp;
+          existing.taxMode = fields.taxMode;
+          existing.issueDate = fields.issueDate;
+          existing.dueDate = fields.dueDate;
+          existing.validUntil = fields.validUntil;
+          existing.reference = fields.reference;
+          existing.notes = fields.notes;
+          existing.terms = fields.terms;
+          existing.projectId = fields.projectId as typeof existing.projectId;
+
+          if (client) {
+            existing.clientId = client._id;
+            existing.clientSnapshot = buildClientSnapshot(client) as typeof existing.clientSnapshot;
+          } else if (input.clientSnapshot) {
+            existing.clientSnapshot = input.clientSnapshot as typeof existing.clientSnapshot;
+          }
+
+          applyTotals(existing);
+          await existing.save();
+          results.push({
+            status: 'updated',
+            clientUuid: input.clientUuid,
+            document: serializeDocument(existing, today),
+          });
+          continue;
+        }
+
         const created = await documents.create({
-          clientUuid: input.clientUuid,
+          clientUuid: existing ? randomUUID() : input.clientUuid,
           docType: input.docType,
           status: 'draft',
           number: null,

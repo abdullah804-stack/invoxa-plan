@@ -110,6 +110,10 @@ export default function InvoicesScreen() {
   const canCreate = activeRole ? can(activeRole, 'drafts:create') : false;
   const canUseAi = activeRole ? can(activeRole, 'ai:use') : false;
 
+  const offlineCount = offline.data?.length ?? 0;
+  const conflictCount = (offline.data ?? []).filter((item) => item.conflict).length;
+  const waitingCount = offlineCount - conflictCount;
+
   const showNotice = useCallback((message: string) => {
     setNotice(message);
     if (noticeTimer.current) clearTimeout(noticeTimer.current);
@@ -193,7 +197,7 @@ export default function InvoicesScreen() {
           </View>
         </View>
 
-        {(offline.data?.length ?? 0) > 0 ? (
+        {offlineCount > 0 ? (
           <View
             style={[
               styles.offlineBanner,
@@ -202,35 +206,50 @@ export default function InvoicesScreen() {
           >
             <View style={styles.offlineText}>
               <Text style={[styles.offlineTitle, { color: colors.text }]}>
-                {offline.data?.length} draft{(offline.data?.length ?? 0) === 1 ? '' : 's'} saved on
-                this phone
+                {offlineCount} draft{offlineCount === 1 ? '' : 's'} saved on this phone
               </Text>
               <Text style={[styles.offlineNote, { color: colors.textMuted }]}>
-                They sync when you are back online. Nothing is lost.
+                {conflictCount > 0
+                  ? `${conflictCount} need${conflictCount === 1 ? 's' : ''} your decision: keep the phone copy or discard it.`
+                  : 'They sync when you are back online. Nothing is lost.'}
               </Text>
             </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Sync offline drafts"
-              disabled={syncOffline.isPending}
-              onPress={() =>
-                syncOffline.mutate(undefined, {
-                  onSuccess: (result) =>
-                    showNotice(
-                      result.remaining === 0
-                        ? `${result.synced} of ${result.sent} synced.`
-                        : `${result.synced} synced, ${result.conflicts} need attention.`,
-                    ),
-                  onError: (error) => showNotice(errorMessage(error)),
-                })
-              }
-            >
-              {syncOffline.isPending ? (
-                <ActivityIndicator color={colors.accent} />
-              ) : (
-                <Text style={[styles.offlineAction, { color: colors.accent }]}>Sync now</Text>
-              )}
-            </Pressable>
+            <View style={styles.offlineActions}>
+              {conflictCount > 0 ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Review ${conflictCount} draft conflict${conflictCount === 1 ? '' : 's'}`}
+                  onPress={() => router.push('/drafts/conflicts')}
+                  hitSlop={8}
+                >
+                  <Text style={[styles.offlineAction, { color: colors.accent }]}>Review</Text>
+                </Pressable>
+              ) : null}
+              {waitingCount > 0 ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Sync offline drafts"
+                  disabled={syncOffline.isPending}
+                  onPress={() =>
+                    syncOffline.mutate(undefined, {
+                      onSuccess: (result) =>
+                        showNotice(
+                          result.remaining === 0
+                            ? `${result.synced} of ${result.sent} synced.`
+                            : `${result.synced} synced. ${result.remaining} still on this phone.`,
+                        ),
+                      onError: (error) => showNotice(errorMessage(error)),
+                    })
+                  }
+                >
+                  {syncOffline.isPending ? (
+                    <ActivityIndicator color={colors.accent} />
+                  ) : (
+                    <Text style={[styles.offlineAction, { color: colors.accent }]}>Sync now</Text>
+                  )}
+                </Pressable>
+              ) : null}
+            </View>
           </View>
         ) : null}
 
@@ -376,6 +395,10 @@ const styles = StyleSheet.create({
   },
   offlineAction: {
     ...typeScale.bodyStrong,
+  },
+  offlineActions: {
+    alignItems: 'flex-end',
+    gap: spacing.xs,
   },
   headerActions: {
     flexDirection: 'row',

@@ -37,11 +37,16 @@ export type ExpenseCsvQuery = z.infer<typeof expenseCsvQuerySchema>;
  * Offline sync. The phone sends the drafts it created or edited while it had no
  * signal. Each item carries the device clientUuid, which makes a retried sync a
  * no-op, and the updatedAt it last saw, so a server change is never overwritten
- * silently: the result says `conflict` and the app offers keep-both.
+ * silently: the result says `conflict` and the app asks the user to choose.
  */
 export const syncInvoiceItemSchema = z.object({
   /** The server updatedAt the device started from; omitted for a new draft. */
   baseUpdatedAt: z.string().trim().max(40).nullish(),
+  /**
+   * The user's answer to a conflict. `keep-mine` writes the phone copy over the
+   * server draft, or into a new draft when the server copy was already issued.
+   */
+  resolution: z.enum(['keep-mine']).optional(),
   document: documentInputSchema,
 });
 

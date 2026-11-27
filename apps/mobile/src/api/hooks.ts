@@ -1,7 +1,14 @@
 import { retryAsync, splitBackupForUpload } from '@invoxa/shared';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from '../auth/SessionProvider';
-import { cacheRead, cacheWrite, isOfflineError, readQueue, removeQueued } from '../lib/offline';
+import {
+  cacheRead,
+  cacheWrite,
+  isOfflineError,
+  readQueue,
+  removeQueued,
+  setQueuedConflict,
+} from '../lib/offline';
 import { ApiError } from './client';
 import {
   acceptInvite,
@@ -1006,7 +1013,10 @@ export function useOfflineDrafts() {
   });
 }
 
-/** Sends the queue once; created and updated items leave it, conflicts stay. */
+/**
+ * Sends the queue once: created and updated items leave it, conflicts stay and
+ * carry the server's answer so the banner can ask the user what to do.
+ */
 export function useSyncOfflineDrafts() {
   const queryClient = useQueryClient();
   const { activeBusinessId } = useSession();
@@ -1015,10 +1025,14 @@ export function useSyncOfflineDrafts() {
     mutationFn: async () => {
       if (!activeBusinessId) throw new Error('Choose a business first');
       const queue = await readQueue(activeBusinessId);
-      if (queue.length === 0) return { sent: 0, synced: 0, conflicts: 0, remaining: 0 };
+      // A draft the user has already been asked about waits for their answer.
+      const pending = queue.filter((item) => !item.conflict);
+      if (pending.length === 0) {
+        return { sent: 0, synced: 0, conflicts: 0, remaining: queue.length };
+      }
 
       const response = await syncInvoices(
-        queue.map((item) => ({
+        pending.map((item) => ({
           baseUpdatedAt: item.baseUpdatedAt,
           document: { ...item.payload, clientUuid: item.clientUuid, docType: item.docType },
         })),
@@ -1027,16 +1041,85 @@ export function useSyncOfflineDrafts() {
         .filter((result) => result.status === 'created' || result.status === 'updated')
         .map((result) => result.clientUuid);
       await removeQueued(activeBusinessId, done);
-      const remaining = (await readQueue(activeBusinessId)).length;
+
+      const conflicts = response.results.filter((result) => result.status === 'conflict');
+      for (const result of conflicts) {
+        await setQueuedConflict(activeBusinessId, result.clientUuid, {
+          message: result.message ?? 'This draft changed on another device.',
+          detectedAt: new Date().toISOString(),
+          serverUpdatedAt: result.document?.updatedAt ?? null,
+          serverDocumentId: result.document?.id ?? null,
+          serverNumber: result.document?.number ?? null,
+          serverStatus: result.document?.status ?? null,
+          serverTotal: result.document?.totals.total ?? null,
+        });
+      }
 
       return {
-        sent: queue.length,
+        sent: pending.length,
         synced: done.length,
-        conflicts: response.results.filter((result) => result.status === 'conflict').length,
-        remaining,
+        conflicts: conflicts.length,
+        remaining: (await readQueue(activeBusinessId)).length,
       };
     },
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['offline-drafts', activeBusinessId] });
+      void queryClient.invalidateQueries({ queryKey: ['documents', activeBusinessId] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.summary(activeBusinessId) });
+    },
+  });
+}
+
+export type OfflineConflictAction = 'keep' | 'discard';
+
+/**
+ * The user's answer to a sync conflict. Keeping the phone copy sends it with the
+ * `keep-mine` resolution: the server writes it over its draft, or saves it as a
+ * new draft when the server copy was already issued. Discarding drops it here.
+ */
+export function useResolveOfflineConflict() {
+  const queryClient = useQueryClient();
+  const { activeBusinessId } = useSession();
+
+  return useMutation({
+    mutationFn: async (input: { clientUuid: string; action: OfflineConflictAction }) => {
+      if (!activeBusinessId) throw new Error('Choose a business first');
+      const queue = await readQueue(activeBusinessId);
+      const item = queue.find((entry) => entry.clientUuid === input.clientUuid);
+      if (!item) return { status: 'gone' as const };
+
+      if (input.action === 'discard') {
+        await removeQueued(activeBusinessId, [item.clientUuid]);
+        return { status: 'discarded' as const };
+      }
+
+      const response = await syncInvoices([
+        {
+          baseUpdatedAt: null,
+          resolution: 'keep-mine',
+          document: { ...item.payload, clientUuid: item.clientUuid, docType: item.docType },
+        },
+      ]);
+      const result = response.results[0];
+      if (result && (result.status === 'created' || result.status === 'updated')) {
+        await removeQueued(activeBusinessId, [item.clientUuid]);
+        return { status: 'kept' as const };
+      }
+
+      // Still refused: keep the draft and show the server's reason.
+      const message = result?.message ?? 'The server did not accept this copy.';
+      await setQueuedConflict(activeBusinessId, item.clientUuid, {
+        message,
+        detectedAt: new Date().toISOString(),
+        serverUpdatedAt: result?.document?.updatedAt ?? item.conflict?.serverUpdatedAt ?? null,
+        serverDocumentId: result?.document?.id ?? item.conflict?.serverDocumentId ?? null,
+        serverNumber: result?.document?.number ?? item.conflict?.serverNumber ?? null,
+        serverStatus: result?.document?.status ?? item.conflict?.serverStatus ?? null,
+        serverTotal: result?.document?.totals.total ?? item.conflict?.serverTotal ?? null,
+      });
+      throw new Error(message);
+    },
+    onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['offline-drafts', activeBusinessId] });
       void queryClient.invalidateQueries({ queryKey: ['documents', activeBusinessId] });
       void queryClient.invalidateQueries({ queryKey: queryKeys.summary(activeBusinessId) });

@@ -402,6 +402,73 @@ describe('week 17: reports, exports, receipts, QR, refine and offline sync', () 
     expect(mixed.body.results[1].status).toBe('created');
   });
 
+  it('keeps the phone copy when the user answers a sync conflict', async () => {
+    const clientUuid = `offline-${randomSuffix()}`;
+    const phoneCopy = {
+      clientUuid,
+      docType: 'invoice',
+      items: [{ description: 'Phone copy', quantity: 1, unitPrice: 42_000 }],
+      currency: 'USD',
+    };
+
+    const first = await testApp
+      .request()
+      .post('/api/v1/sync/invoices')
+      .set(headersFor(owner))
+      .send({ invoices: [{ document: phoneCopy }] });
+    expect(first.body.results[0].status).toBe('created');
+    const documentId = first.body.results[0].document.id as string;
+    const base = first.body.results[0].document.updatedAt as string;
+
+    await testApp
+      .request()
+      .put(`/api/v1/invoices/${documentId}`)
+      .set(headersFor(owner))
+      .send({ notes: 'Changed elsewhere' });
+
+    // The stale queue entry stays a conflict until the user answers it.
+    const staleEntry = { baseUpdatedAt: base, document: phoneCopy };
+    const stale = await testApp
+      .request()
+      .post('/api/v1/sync/invoices')
+      .set(headersFor(owner))
+      .send({ invoices: [staleEntry] });
+    expect(stale.body.results[0].status).toBe('conflict');
+
+    // "Keep the phone copy" writes it over the server draft anyway.
+    const kept = await testApp
+      .request()
+      .post('/api/v1/sync/invoices')
+      .set(headersFor(owner))
+      .send({ invoices: [{ ...staleEntry, resolution: 'keep-mine' }] });
+    expect(kept.body.results[0].status).toBe('updated');
+    expect(kept.body.results[0].document.items[0].description).toBe('Phone copy');
+    expect(kept.body.results[0].document.totals.total).toBe(42_000);
+
+    // An issued document is history: the phone copy becomes a new draft instead.
+    const issued = await testApp
+      .request()
+      .post(`/api/v1/invoices/${documentId}/issue`)
+      .set(headersFor(owner))
+      .send({});
+    expect(issued.status).toBe(200);
+
+    const copied = await testApp
+      .request()
+      .post('/api/v1/sync/invoices')
+      .set(headersFor(owner))
+      .send({ invoices: [{ document: phoneCopy, resolution: 'keep-mine' }] });
+    expect(copied.body.results[0].status).toBe('created');
+    expect(copied.body.results[0].document.id).not.toBe(documentId);
+    expect(copied.body.results[0].document.number).toBeNull();
+
+    const drafts = await testApp
+      .request()
+      .get('/api/v1/invoices?status=draft')
+      .set(headersFor(owner));
+    expect(drafts.body.documents).toHaveLength(1);
+  });
+
   it('returns 404, never 403, for another business’s statement', async () => {
     const seeded = await seedInvoice(owner);
     const other = await registerAccount(testApp.request, { businessName: 'Other Ltd' });

@@ -23,6 +23,22 @@ export interface QueuedDraft {
   baseUpdatedAt: string | null;
   payload: DocumentDraftBody;
   queuedAt: string;
+  /**
+   * Set when the server refused this draft because it changed elsewhere. The
+   * draft stays queued until the user keeps the phone copy or discards it.
+   */
+  conflict?: QueuedConflict;
+}
+
+/** What the server held when it refused the phone copy, so the user can compare. */
+export interface QueuedConflict {
+  message: string;
+  detectedAt: string;
+  serverUpdatedAt: string | null;
+  serverDocumentId: string | null;
+  serverNumber: string | null;
+  serverStatus: string | null;
+  serverTotal: number | null;
 }
 
 const QUEUE_PREFIX = '@invoxa/queue';
@@ -127,6 +143,23 @@ export async function removeQueued(businessId: string, clientUuids: string[]): P
   await writeQueue(
     businessId,
     queue.filter((entry) => !remove.has(entry.clientUuid)),
+  );
+}
+
+/** Records — or clears — why a queued draft is waiting for the user's decision. */
+export async function setQueuedConflict(
+  businessId: string,
+  clientUuid: string,
+  conflict: QueuedConflict | null,
+): Promise<void> {
+  const queue = await readQueue(businessId);
+  await writeQueue(
+    businessId,
+    queue.map((entry) => {
+      if (entry.clientUuid !== clientUuid) return entry;
+      const { conflict: _previous, ...rest } = entry;
+      return conflict ? { ...rest, conflict } : rest;
+    }),
   );
 }
 
