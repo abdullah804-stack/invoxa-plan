@@ -504,9 +504,15 @@ commits did not build.
 - [x] Reminder message sheet with WhatsApp, email and share links, in the invoice language
 - [x] Offline drafts: a device queue, `POST /sync/invoices` with per-item results and conflicts, a
       cached dashboard and invoice list, and a sync banner
+- [x] Conflict resolution: a refused draft records the server's reason and what the server holds,
+      the invoice banner shows how many need a decision with a Review step, and
+      `app/drafts/conflicts.tsx` answers each one — keep the phone copy (`resolution: 'keep-mine'`,
+      which overwrites the server draft, or saves the copy as a new draft once the server copy was
+      issued) or discard it. Conflicted drafts are no longer re-sent on every sync
 - [x] Voice drafting on the Describe-it screen, hidden where speech recognition cannot run
-- [x] 13 shared tests (`reports.test.ts`) and 8 API tests (`week17.test.ts`); suite is 117 shared +
-      132 API, all green; web and Android bundles build; lint and typecheck clean
+- [x] 13 shared tests (`reports.test.ts`) and 9 API tests (`week17.test.ts`, including keep-the-phone-
+      copy over a draft and as a new draft once issued); suite is 117 shared + 133 API, all green;
+      web and Android bundles build; lint, format and typecheck clean
 - [ ] The device half of the checklist: PDFs, share sheet, WhatsApp/email hand-off, speech and
       airplane-mode sync — no phone or emulator is attached
 - [ ] Live Gemini quality for refine — needs `GEMINI_API_KEY`
