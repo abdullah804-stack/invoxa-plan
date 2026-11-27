@@ -108,14 +108,19 @@ describe('validation and operator injection', () => {
   it('rejects a body larger than the 1 MB limit', async () => {
     const account = await registerAccount(testApp.request);
 
-    const response = await testApp
-      .request()
-      .put('/api/v1/profile')
-      .set(headersFor(account))
-      .send({ name: 'x'.repeat(1_200_000) });
+    // Over a real socket this is racy: Fastify answers 413 and stops reading while
+    // the client is still writing, so on Windows the client can see ECONNRESET
+    // instead of the response. inject() runs the same route, JSON parser, body
+    // limit and error handler without that socket race.
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/profile',
+      headers: { ...headersFor(account), 'content-type': 'application/json' },
+      payload: JSON.stringify({ name: 'x'.repeat(1_200_000) }),
+    });
 
-    expect(response.status).toBe(413);
-    expect(response.body.error.code).toBe('PAYLOAD_TOO_LARGE');
+    expect(response.statusCode).toBe(413);
+    expect(response.json().error.code).toBe('PAYLOAD_TOO_LARGE');
   });
 
   it('requires a JSON body to be an object', async () => {
