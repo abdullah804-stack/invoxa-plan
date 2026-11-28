@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 import {
   aiDraftRequestSchema,
   aiRefineRequestSchema,
+  aiTranscribeRequestSchema,
   receiptScanRequestSchema,
 } from '@invoxa/shared';
 import type { ApiConfig } from '../config.js';
@@ -10,7 +11,13 @@ import { authenticate } from '../auth/authenticate.js';
 import { AppError, errors } from '../errors.js';
 import { AiUsage } from '../models/aiUsage.js';
 import { Business } from '../models/business.js';
-import { requestAiDraft, requestAiRefine, requestReceiptScan } from '../services/ai.js';
+import {
+  requestAiDraft,
+  requestAiRefine,
+  requestReceiptScan,
+  requestTranscription,
+  type AiProvider,
+} from '../services/ai.js';
 import { requestToday } from '../services/documents.js';
 import { requireAction, resolveTenant } from '../tenant.js';
 import { parseOrThrow } from '../validation.js';
@@ -58,6 +65,27 @@ async function takeAiUse(
   };
 }
 
+interface TextAssistant {
+  provider: AiProvider;
+  apiKey: string;
+  model: string;
+}
+
+/**
+ * The provider that writes text. DeepSeek is text only, so receipts and voice
+ * always go to Gemini even when AI_PROVIDER is deepseek.
+ */
+function textAssistant(config: ApiConfig): TextAssistant | null {
+  if (config.aiProvider === 'deepseek') {
+    return config.deepseekApiKey
+      ? { provider: 'deepseek', apiKey: config.deepseekApiKey, model: config.deepseekModel }
+      : null;
+  }
+  return config.geminiApiKey
+    ? { provider: 'gemini', apiKey: config.geminiApiKey, model: config.geminiModel }
+    : null;
+}
+
 /**
  * AI drafting returns a suggestion; the app creates an ordinary draft from it.
  * The route never writes a document, never assigns a number and never sends
@@ -79,7 +107,8 @@ export const aiRoutes: FastifyPluginAsync<AiRouteOptions> = async (app, { config
 
       const input = parseOrThrow(aiDraftRequestSchema, request.body ?? {});
 
-      if (!config.geminiApiKey) {
+      const assistant = textAssistant(config);
+      if (!assistant) {
         throw new AppError('AI_FAILED', 'AI drafting is not set up on this server yet.');
       }
 
@@ -93,8 +122,9 @@ export const aiRoutes: FastifyPluginAsync<AiRouteOptions> = async (app, { config
       let draft;
       try {
         draft = await requestAiDraft({
-          apiKey: config.geminiApiKey,
-          model: config.geminiModel,
+          provider: assistant.provider,
+          apiKey: assistant.apiKey,
+          model: assistant.model,
           prompt: input.prompt,
           currency: business.defaultCurrency ?? 'USD',
           docType: input.docType,
@@ -124,8 +154,12 @@ export const aiRoutes: FastifyPluginAsync<AiRouteOptions> = async (app, { config
 
       const input = parseOrThrow(receiptScanRequestSchema, request.body ?? {});
 
+      // DeepSeek cannot read a photo, so this one always needs Gemini.
       if (!config.geminiApiKey) {
-        throw new AppError('AI_FAILED', 'Receipt scanning is not set up on this server yet.');
+        throw new AppError(
+          'AI_FAILED',
+          'Receipt scanning needs a Gemini key on this server. Add GEMINI_API_KEY to turn it on.',
+        );
       }
 
       const business = await Business.findById(context.businessId);
@@ -154,6 +188,56 @@ export const aiRoutes: FastifyPluginAsync<AiRouteOptions> = async (app, { config
   );
 
   /**
+   * Voice input on phones without on-device recognition (Expo Go): a short clip
+   * in, one editable sentence out. The clip is dropped when the request ends.
+   */
+  app.post(
+    '/ai/transcribe',
+    {
+      preHandler: authenticateRequest,
+      // A compressed recording is a few hundred KB; base64 adds a third.
+      bodyLimit: 3 * 1024 * 1024,
+      config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
+    },
+    async (request) => {
+      const context = await resolveTenant(request);
+      requireAction(context, 'ai:use');
+
+      const input = parseOrThrow(aiTranscribeRequestSchema, request.body ?? {});
+
+      // Transcription is audio, so it always goes to Gemini.
+      if (!config.geminiApiKey) {
+        throw new AppError(
+          'AI_FAILED',
+          'Voice input needs a Gemini key on this server. Add GEMINI_API_KEY to turn it on.',
+        );
+      }
+
+      const business = await Business.findById(context.businessId);
+      if (!business) {
+        throw errors.notFound();
+      }
+
+      const { used, refund } = await takeAiUse(request, config, context.businessId, context.userId);
+
+      let result;
+      try {
+        result = await requestTranscription({
+          apiKey: config.geminiApiKey,
+          model: config.geminiModel,
+          audio: input.audio,
+          ...(input.language ? { language: input.language } : {}),
+        });
+      } catch (error) {
+        await refund();
+        throw error;
+      }
+
+      return { text: result.text, remaining: Math.max(0, config.aiDailyLimit - used) };
+    },
+  );
+
+  /**
    * Refine one piece of text the user wrote. It returns text only and never
    * writes a document: prices, quantities, dates and totals never leave the app
    * as prompt text, so the assistant cannot change them.
@@ -170,7 +254,8 @@ export const aiRoutes: FastifyPluginAsync<AiRouteOptions> = async (app, { config
 
       const input = parseOrThrow(aiRefineRequestSchema, request.body ?? {});
 
-      if (!config.geminiApiKey) {
+      const assistant = textAssistant(config);
+      if (!assistant) {
         throw new AppError('AI_FAILED', 'AI editing is not set up on this server yet.');
       }
 
@@ -184,8 +269,9 @@ export const aiRoutes: FastifyPluginAsync<AiRouteOptions> = async (app, { config
       let refined;
       try {
         refined = await requestAiRefine({
-          apiKey: config.geminiApiKey,
-          model: config.geminiModel,
+          provider: assistant.provider,
+          apiKey: assistant.apiKey,
+          model: assistant.model,
           text: input.text,
           tone: input.tone,
           language: input.language ?? business.language ?? 'en',

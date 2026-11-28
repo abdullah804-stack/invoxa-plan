@@ -3,11 +3,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
 import { DocumentRow } from '../../src/components/DocumentRow';
 import { Screen } from '../../src/components/Screen';
 import { Skeleton, SkeletonRows } from '../../src/components/Skeleton';
-import { EmptyState, ErrorState } from '../../src/components/States';
+import { ErrorState } from '../../src/components/States';
 import { useReminders, useRunRecurring, useSummary } from '../../src/api/hooks';
 import { useSession } from '../../src/auth/SessionProvider';
 import { errorMessage } from '../../src/lib/errors';
@@ -116,21 +117,20 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Open reports"
-          onPress={() => router.push('/reports')}
-        >
-          <Card style={styles.reminderCard}>
-            <View style={styles.reminderTop}>
-              <Ionicons name="stats-chart-outline" size={18} color={colors.accent} />
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Reports</Text>
-            </View>
-            <Text style={[styles.reminderText, { color: colors.textMuted }]}>
-              Cash flow, aging, sales by client, tax and CSV exports.
-            </Text>
-          </Card>
-        </Pressable>
+        {/* The two things this app is for, always one tap away. */}
+        <View style={styles.quickActions}>
+          <Button
+            title="New invoice"
+            onPress={() => router.push('/document/new?docType=invoice')}
+            style={styles.quickAction}
+          />
+          <Button
+            title="Describe it"
+            variant="secondary"
+            onPress={() => router.push('/document/ai')}
+            style={styles.quickAction}
+          />
+        </View>
 
         {reminders.data && reminders.data.counts.overdue + reminders.data.counts.dueSoon > 0 ? (
           <Pressable
@@ -163,12 +163,31 @@ export default function DashboardScreen() {
             onRetry={() => void summary.refetch()}
           />
         ) : !data || !hasDocuments ? (
-          <EmptyState
-            title="Nothing outstanding"
-            message="When you issue an invoice, the amount owed appears here by currency."
-            actionTitle="See invoices"
-            onAction={() => router.push('/invoices')}
-          />
+          <Card style={styles.startCard}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Start here</Text>
+            <Text style={[styles.note, { color: colors.textMuted }]}>
+              Your first invoice takes about a minute:
+            </Text>
+            <View style={styles.startSteps}>
+              <Text style={[styles.startStep, { color: colors.text }]}>
+                1. Type the client's name — no client record needed.
+              </Text>
+              <Text style={[styles.startStep, { color: colors.text }]}>
+                2. Add each line and its price; the totals are worked out for you.
+              </Text>
+              <Text style={[styles.startStep, { color: colors.text }]}>
+                3. Preview the PDF, then share it or send it by email.
+              </Text>
+            </View>
+            <Button
+              title="Create your first invoice"
+              onPress={() => router.push('/document/new?docType=invoice')}
+            />
+            <Text style={[styles.note, { color: colors.textMuted }]}>
+              In a hurry? Tap Describe it and write one sentence, such as “3 days of design at 450
+              for Acme”. Your logo and address can wait: Settings → Edit.
+            </Text>
+          </Card>
         ) : (
           <>
             {data.currencies.length > 0 ? (
@@ -248,6 +267,20 @@ export default function DashboardScreen() {
             </View>
           </>
         )}
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open reports"
+          onPress={() => router.push('/reports')}
+          style={styles.reportsRow}
+        >
+          <Ionicons name="stats-chart-outline" size={18} color={colors.accent} />
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Reports</Text>
+          <Text style={[styles.note, styles.reportsHint, { color: colors.textMuted }]}>
+            Cash flow, aging, tax, CSV
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+        </Pressable>
       </ScrollView>
     </Screen>
   );
@@ -322,6 +355,32 @@ const styles = StyleSheet.create({
   },
   note: {
     ...typeScale.small,
+  },
+  quickActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  quickAction: {
+    flex: 1,
+  },
+  startCard: {
+    gap: spacing.md,
+  },
+  startSteps: {
+    gap: spacing.sm,
+  },
+  startStep: {
+    ...typeScale.body,
+  },
+  reportsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  reportsHint: {
+    flex: 1,
+    textAlign: 'right',
   },
   reminderCard: {
     gap: spacing.xs,

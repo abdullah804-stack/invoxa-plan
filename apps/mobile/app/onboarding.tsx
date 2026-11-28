@@ -256,7 +256,7 @@ export default function OnboardingScreen() {
             <Text style={[styles.title, { color: colors.text }]}>{STEP_TITLES[step]}</Text>
             <Text style={[styles.subtitle, { color: colors.textMuted }]}>
               {step === 0
-                ? 'This is what your clients see at the top of every invoice.'
+                ? 'Only a business name is needed now. Everything else is optional and can wait.'
                 : step === 1
                   ? 'Pick a colour and add your logo. Keep it simple and readable.'
                   : 'Everything is saved. You can change it any time in settings.'}
@@ -274,7 +274,7 @@ export default function OnboardingScreen() {
                 autoCapitalize="words"
               />
               <TextField
-                label="Email"
+                label="Email (optional)"
                 value={email}
                 onChangeText={setEmail}
                 placeholder="hello@studio.com"
@@ -284,7 +284,7 @@ export default function OnboardingScreen() {
                 autoCorrect={false}
               />
               <TextField
-                label="Phone"
+                label="Phone (optional)"
                 value={phone}
                 onChangeText={setPhone}
                 placeholder="+1 555 0100"
@@ -292,7 +292,7 @@ export default function OnboardingScreen() {
                 autoComplete="tel"
               />
               <TextField
-                label="Address"
+                label="Address (optional)"
                 value={address}
                 onChangeText={setAddress}
                 placeholder="Street, city, country"
@@ -452,6 +452,19 @@ export default function OnboardingScreen() {
               style={styles.nextButton}
             />
           </View>
+
+          {step < 2 ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Skip setup for now"
+              onPress={close}
+              style={styles.skipRow}
+            >
+              <Text style={[styles.skipText, { color: colors.textMuted }]}>
+                Skip for now — you can finish this in Settings any time
+              </Text>
+            </Pressable>
+          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>
@@ -586,5 +599,13 @@ const styles = StyleSheet.create({
   },
   nextButton: {
     flex: 2,
+  },
+  skipRow: {
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  skipText: {
+    ...typeScale.small,
+    textAlign: 'center',
   },
 });

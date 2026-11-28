@@ -1,3 +1,5 @@
+import { DEFAULT_DEEPSEEK_MODEL, DEFAULT_GEMINI_MODEL, type AiProvider } from './services/ai.js';
+
 export interface RateLimits {
   /** General API limit per minute per user. */
   generalMax: number;
@@ -15,8 +17,12 @@ export interface ApiConfig {
   corsOrigins: string[];
   jobSecret?: string;
   aiDailyLimit: number;
+  /** Which provider writes draft lines and refines text. Receipts and voice always use Gemini. */
+  aiProvider: AiProvider;
   geminiApiKey?: string;
   geminiModel: string;
+  deepseekApiKey?: string;
+  deepseekModel: string;
   rateLimits: RateLimits;
 }
 
@@ -82,6 +88,25 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     .map((origin) => origin.trim())
     .filter((origin) => origin.length > 0);
 
+  const geminiApiKey = optional(env, 'GEMINI_API_KEY');
+  const deepseekApiKey = optional(env, 'DEEPSEEK_API_KEY');
+  const requestedProvider = optional(env, 'AI_PROVIDER');
+  if (requestedProvider && requestedProvider !== 'gemini' && requestedProvider !== 'deepseek') {
+    throw new ConfigError('AI_PROVIDER must be gemini or deepseek');
+  }
+
+  // An explicit AI_PROVIDER wins. Otherwise a DeepSeek-only setup uses DeepSeek,
+  // and anything else keeps Gemini, which is the only provider that reads photos
+  // and audio.
+  const aiProvider: AiProvider =
+    requestedProvider === 'deepseek'
+      ? 'deepseek'
+      : requestedProvider === 'gemini'
+        ? 'gemini'
+        : !geminiApiKey && deepseekApiKey
+          ? 'deepseek'
+          : 'gemini';
+
   return {
     nodeEnv,
     port,
@@ -91,8 +116,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     corsOrigins,
     ...(optional(env, 'JOB_SECRET') ? { jobSecret: optional(env, 'JOB_SECRET') } : {}),
     aiDailyLimit: intFromEnv(env, 'AI_DAILY_LIMIT', 30),
-    ...(optional(env, 'GEMINI_API_KEY') ? { geminiApiKey: optional(env, 'GEMINI_API_KEY') } : {}),
-    geminiModel: optional(env, 'GEMINI_MODEL') ?? 'gemini-2.5-flash',
+    aiProvider,
+    ...(geminiApiKey ? { geminiApiKey } : {}),
+    geminiModel: optional(env, 'GEMINI_MODEL') ?? DEFAULT_GEMINI_MODEL,
+    ...(deepseekApiKey ? { deepseekApiKey } : {}),
+    deepseekModel: optional(env, 'DEEPSEEK_MODEL') ?? DEFAULT_DEEPSEEK_MODEL,
     rateLimits: {
       generalMax: intFromEnv(env, 'RATE_LIMIT_MAX', 120),
       authMax: intFromEnv(env, 'RATE_LIMIT_AUTH_MAX', 10),

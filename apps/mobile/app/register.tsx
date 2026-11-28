@@ -50,7 +50,9 @@ export default function RegisterScreen() {
     setBusy(true);
     try {
       await register(parsed.data);
-      router.replace('/onboarding');
+      // Straight to the app: business details and branding are optional and live
+      // in Settings, so nobody has to fill a form before their first invoice.
+      router.replace('/');
     } catch (error) {
       setErrors(fieldErrors(error));
       setSubmitError(errorMessage(error));
@@ -83,7 +85,7 @@ export default function RegisterScreen() {
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.text }]}>Start invoicing</Text>
             <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-              One account, one business. You can add a logo and colour next.
+              One account, one business. You can add a logo and colour later.
             </Text>
           </View>
 

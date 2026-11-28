@@ -132,6 +132,22 @@ export function draftWithAi(input: {
   });
 }
 
+/**
+ * Voice input where on-device recognition cannot run (Expo Go): the clip is
+ * transcribed once on the server and never stored.
+ */
+export function transcribeAudio(
+  audio: string,
+  language?: string,
+): Promise<{ text: string; remaining: number }> {
+  return apiRequest<{ text: string; remaining: number }>('/ai/transcribe', {
+    method: 'POST',
+    body: { audio, ...(language ? { language } : {}) },
+    // Transcribing a clip is slower than a text prompt.
+    timeoutMs: 95_000,
+  });
+}
+
 export function fetchBrandAsset(id: string): Promise<{ asset: BrandAsset }> {
   return apiRequest<{ asset: BrandAsset }>(`/brand-assets/${id}`);
 }

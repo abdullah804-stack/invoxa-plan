@@ -1,8 +1,9 @@
 import { can, normalizeNameKey } from '@invoxa/shared';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -12,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import { listClients } from '../../src/api/endpoints';
-import { useAiDraft, useCreateDocument } from '../../src/api/hooks';
+import { useAiDraft, useCreateDocument, useTranscribeAudio } from '../../src/api/hooks';
 import { useSession } from '../../src/auth/SessionProvider';
 import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
@@ -23,6 +24,7 @@ import { TextField } from '../../src/components/TextField';
 import { errorMessage } from '../../src/lib/errors';
 import { readSecure, StorageKeys, writeSecure } from '../../src/lib/storage';
 import { useVoiceInput } from '../../src/lib/useVoiceInput';
+import { useVoiceRecording } from '../../src/lib/useVoiceRecording';
 import { radius, spacing, typeScale } from '../../src/theme/tokens';
 import { useTheme } from '../../src/theme/ThemeProvider';
 
@@ -65,12 +67,26 @@ export default function AiDraftScreen() {
 
   const canUseAi = activeRole ? can(activeRole, 'ai:use') : false;
   const busy = ai.isPending || createDocument.isPending;
+
   // Speech becomes ordinary text in the field; the draft is only requested when
   // the user presses Draft it, so talking never submits anything by itself.
-  const voice = useVoiceInput(
-    (text) => setPrompt((current) => (current.trim() ? `${current.trim()} ${text}` : text)),
-    'en',
-  );
+  const appendText = useCallback((text: string) => {
+    setPrompt((current) => (current.trim() ? `${current.trim()} ${text}` : text));
+  }, []);
+
+  // On-device recognition where it exists (web, development builds); otherwise a
+  // short recording transcribed by the API, which works in Expo Go.
+  const speech = useVoiceInput(appendText, 'en');
+  const transcribe = useTranscribeAudio();
+  const recorder = useVoiceRecording(async (audio) => {
+    const result = await transcribe.mutateAsync(audio);
+    appendText(result.text);
+  });
+
+  const listening = speech.listening || recorder.recording;
+  const turningIntoText = recorder.transcribing || transcribe.isPending;
+  const voiceError =
+    speech.error ?? recorder.error ?? (transcribe.isError ? errorMessage(transcribe.error) : null);
 
   useEffect(() => {
     let active = true;
@@ -198,32 +214,49 @@ export default function AiDraftScreen() {
                 maxLength={1000}
               />
 
-              {voice.available ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={voice.listening ? 'Stop speaking' : 'Speak your draft'}
-                  onPress={() => (voice.listening ? voice.stop() : voice.start())}
-                  style={[
-                    styles.voiceRow,
-                    {
-                      backgroundColor: voice.listening ? colors.accentSoft : colors.surfaceMuted,
-                      borderColor: voice.listening ? colors.accent : colors.border,
-                    },
-                  ]}
-                >
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={listening ? 'Stop and use what was said' : 'Speak your draft'}
+                accessibilityState={{ busy: turningIntoText, disabled: turningIntoText }}
+                disabled={turningIntoText}
+                onPress={
+                  speech.available
+                    ? () => (listening ? speech.stop() : speech.start())
+                    : () => (listening ? recorder.stop() : recorder.start())
+                }
+                style={[
+                  styles.voiceRow,
+                  {
+                    backgroundColor: listening ? colors.accentSoft : colors.surfaceMuted,
+                    borderColor: listening ? colors.accent : colors.border,
+                  },
+                ]}
+              >
+                {turningIntoText ? (
+                  <ActivityIndicator size="small" color={colors.accent} />
+                ) : (
                   <Ionicons
-                    name={voice.listening ? 'stop-circle-outline' : 'mic-outline'}
+                    name={listening ? 'stop-circle-outline' : 'mic-outline'}
                     size={20}
                     color={colors.accent}
                   />
-                  <Text style={[styles.voiceLabel, { color: colors.text }]}>
-                    {voice.listening ? 'Listening… tap to stop' : 'Or speak it'}
-                  </Text>
-                </Pressable>
+                )}
+                <Text style={[styles.voiceLabel, { color: colors.text }]}>
+                  {turningIntoText
+                    ? 'Turning your voice into text…'
+                    : listening
+                      ? 'Listening… tap to stop'
+                      : 'Or speak it'}
+                </Text>
+              </Pressable>
+              {voiceError ? (
+                <Text style={[styles.footnote, { color: colors.danger }]}>{voiceError}</Text>
               ) : null}
-              {voice.error ? (
-                <Text style={[styles.footnote, { color: colors.danger }]}>{voice.error}</Text>
-              ) : null}
+              <Text style={[styles.footnote, { color: colors.textMuted }]}>
+                {speech.available
+                  ? 'Your phone turns speech into text. Nothing is uploaded.'
+                  : 'Speak one sentence. A short clip is turned into text and not stored.'}
+              </Text>
 
               <View style={styles.examples}>
                 {EXAMPLES.map((example) => (

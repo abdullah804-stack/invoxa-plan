@@ -35,6 +35,12 @@
         { "faceIDPermission": "Invoxa uses Face ID to unlock the app on this phone." }
       ],
       [
+        "expo-audio",
+        {
+          "microphonePermission": "Invoxa uses the microphone only while you speak a draft."
+        }
+      ],
+      [
         "expo-speech-recognition",
         {
           "microphonePermission": "Invoxa uses the microphone only while you speak a draft.",

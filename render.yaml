@@ -30,7 +30,15 @@ services:
       # Optional: without it the AI screens say it is not set up.
       - key: GEMINI_API_KEY
         sync: false
+      # Google retires model names; this one is current as of this commit.
       - key: GEMINI_MODEL
-        value: gemini-2.5-flash
+        value: gemini-3.5-flash
+      # Optional text provider. Receipts and voice always use Gemini.
+      - key: AI_PROVIDER
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: DEEPSEEK_MODEL
+        value: deepseek-chat
       - key: AI_DAILY_LIMIT
         value: '30'

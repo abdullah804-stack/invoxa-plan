@@ -6,7 +6,7 @@ import {
   taxModeSchema,
 } from './enums.js';
 import { discountSchema } from './lineItem.js';
-import { isoDateSchema, minorUnitsSchema, optionalText } from './common.js';
+import { isoDateSchema, languageSchema, minorUnitsSchema, optionalText } from './common.js';
 
 /**
  * AI drafting (plan section "AI"). The model only ever produces a *suggestion*;
@@ -63,6 +63,34 @@ export const receiptScanRequestSchema = z.object({
 });
 
 export type ReceiptScanRequest = z.infer<typeof receiptScanRequestSchema>;
+
+/**
+ * Voice input on phones without on-device recognition: a short clip recorded on
+ * the phone, transcribed once by the server and never stored.
+ */
+export const aiTranscribeRequestSchema = z.object({
+  /** An audio data URL (m4a/AAC from the phone). Kept small enough for the body limit. */
+  audio: z
+    .string()
+    .min(100)
+    .max(2_000_000)
+    .refine(
+      (value) =>
+        /^data:audio\/(mp4|m4a|aac|wav|x-wav|mpeg|mp3|webm|ogg);base64,[A-Za-z0-9+/=]+$/.test(
+          value,
+        ),
+      'Send an audio recording',
+    ),
+  language: languageSchema.optional(),
+});
+
+export type AiTranscribeRequest = z.infer<typeof aiTranscribeRequestSchema>;
+
+export const aiTranscribeResultSchema = z.object({
+  text: z.string().trim().min(1).max(1000),
+});
+
+export type AiTranscribeResult = z.infer<typeof aiTranscribeResultSchema>;
 
 export const receiptScanResultSchema = z.object({
   vendor: optionalText(200),

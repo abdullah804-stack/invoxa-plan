@@ -73,6 +73,7 @@ import {
   revokeInvite,
   runRecurring,
   scanReceipt,
+  transcribeAudio,
   setDocumentStatus,
   startTimer,
   stopTimer,
@@ -773,6 +774,12 @@ function useDocumentCacheUpdates() {
     void queryClient.invalidateQueries({ queryKey: ['clients', activeBusinessId] });
     void queryClient.invalidateQueries({ queryKey: ['client', activeBusinessId] });
   };
+}
+
+export function useTranscribeAudio() {
+  return useMutation({
+    mutationFn: (audio: string) => transcribeAudio(audio),
+  });
 }
 
 export function useAiDraft() {

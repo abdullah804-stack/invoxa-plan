@@ -44,7 +44,9 @@ export function testConfig(overrides: Partial<ApiConfig> = {}): ApiConfig {
     jwtExpiresIn: '7d',
     corsOrigins: ['http://localhost:8081'],
     aiDailyLimit: 30,
-    geminiModel: 'gemini-2.5-flash',
+    aiProvider: 'gemini',
+    geminiModel: 'gemini-3.5-flash',
+    deepseekModel: 'deepseek-chat',
     // Tests create several accounts; rate limits are covered by their own case.
     rateLimits: { generalMax: 10_000, authMax: 10_000 },
     ...overrides,
