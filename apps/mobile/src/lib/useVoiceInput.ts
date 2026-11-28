@@ -1,4 +1,4 @@
-import Constants from 'expo-constants';
+import { requireOptionalNativeModule } from 'expo-modules-core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { loadSpeechModule } from './speech';
@@ -20,6 +20,25 @@ import type { SpeechErrorEvent, SpeechModule, SpeechResultEvent } from './speech
  * works in the browser and in an Android or iOS development build.
  */
 
+/**
+ * Whether the recogniser can exist in this build.
+ *
+ * Expo Go cannot contain a third-party native module, and the package throws
+ * while it is being imported when the module is missing, so it must not be
+ * imported to find out. Asking native for the module by name is safe: it
+ * answers null instead of throwing. The web build always uses the package,
+ * because there it ships a browser implementation and needs no native module.
+ */
+function speechModuleBuiltIn(): boolean {
+  if (Platform.OS === 'web') return true;
+
+  try {
+    return requireOptionalNativeModule('ExpoSpeechRecognition') !== null;
+  } catch {
+    return false;
+  }
+}
+
 export interface VoiceInput {
   available: boolean;
   listening: boolean;
@@ -35,13 +54,7 @@ export function useVoiceInput(onText: (text: string) => void, language?: string)
   const handler = useRef(onText);
   handler.current = onText;
 
-  // Expo Go (`storeClient`) cannot contain a third-party native module, so on a
-  // phone there is nothing to probe for. The web build always probes, because it
-  // has its own implementation and must keep the mic.
-  const canProbe = useMemo(
-    () => Platform.OS === 'web' || Constants.executionEnvironment !== 'storeClient',
-    [],
-  );
+  const canProbe = useMemo(speechModuleBuiltIn, []);
 
   useEffect(() => {
     if (!canProbe) return;
